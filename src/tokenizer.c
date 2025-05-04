@@ -175,7 +175,7 @@ bool parse_int(literal_t* dst, const char* src, ErrorData err) {
         }
     }
 
-    *dst = n;
+    if (dst) *dst = n;
     return false;
 }
 
@@ -187,11 +187,10 @@ const char* literal_name(char quote) {
     }
 }
 
-bool parse_str(char** dst, const char* src, ErrorData err) {
+bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, ErrorData err) {
     if (src == NULL) return true;
 
-    size_t len = strlen(src);
-    char* str = malloc(len + 1); // parsed string will never be larger
+    char* str = malloc(src_len); // parsed string is never larger
     if (str == NULL) {
         print_malloc_err();
         return false;
@@ -219,7 +218,7 @@ bool parse_str(char** dst, const char* src, ErrorData err) {
                     if (hi == '\0') {
                         printerr(err,
                             "invalid escape sequence '\\x' in %s literal %s\n",
-                            quote == '\'' ? "character" : "string", src
+                            literal_name(quote), src
                         );
                         free(str);
                         return true;
@@ -266,17 +265,18 @@ bool parse_str(char** dst, const char* src, ErrorData err) {
         }
     }
 
-    str[i++] = '\0';
-    *dst = str;
+    str[i] = '\0';
+    if (dst) *dst = str;
+    if (dst_len) *dst_len = i;
     return false;
 }
 
-bool parse_chr(char* dst, const char* src, ErrorData err) {
+bool parse_chr(char* dst, const char* src, size_t src_len, ErrorData err) {
     char* str;
-    bool failed = parse_str(&str, src, err);
+    size_t len;
+    bool failed = parse_str(&str, &len, src, src_len, err);
     if (failed) return true;
 
-    size_t len = strlen(str);
     if (len < 1) {
         printerr(err, "empty character literal %s\n", src);
         free(str);
@@ -289,7 +289,7 @@ bool parse_chr(char* dst, const char* src, ErrorData err) {
     }
 
     *dst = *str;
-    return true;
+    return false;
 }
 
 Token* tokenize(const char* program, size_t tabsize, const char* filename) {
@@ -428,14 +428,14 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
                         }
                         break;
                     case CHR_LITERAL:
-                        if (parse_chr(&data.chr_literal, str, err)) {
+                        if (parse_chr(&data.chr_literal, str, tokenlen, err)) {
                             free_token_arrn(array, length);
                             free(str);
                             return NULL;
                         }
                         break;
                     case STR_LITERAL:
-                        if (parse_str(&data.str_literal, str, err)) {
+                        if (parse_str(&data.str_literal, NULL, str, tokenlen, err)) {
                             free_token_arrn(array, length);
                             free(str);
                             return NULL;
@@ -467,7 +467,7 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
 
     } while (chr);
 
-    array[length++] = (Token){
+    array[length] = (Token){
         .type = EOF_TOKEN,
         .str = NULL,
         .line = line,
