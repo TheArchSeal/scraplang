@@ -1,7 +1,10 @@
 #pragma once
 
 #include <stddef.h>
-#include <stdint.h>
+#include <inttypes.h>
+
+typedef uint64_t literal_t;
+#define PRIliteral PRIu64
 
 typedef struct Token Token;
 typedef enum TokenEnum TokenEnum;
@@ -100,7 +103,7 @@ enum TokenEnum {
 };
 
 union TokenData {
-    uint64_t int_literal;
+    literal_t int_literal;
     char chr_literal;
     char* str_literal;
     char* var_name;
@@ -113,6 +116,7 @@ struct Token {
     TokenData data;
 };
 
-void free_token_arr(Token** arr);
+void free_token_arr(Token* arr);
+void free_token_arrn(Token* arr, size_t n);
 
-Token* tokenize(const char* program, size_t tabsize);
+Token* tokenize(const char* program, size_t tabsize, const char* filename);

@@ -6,7 +6,7 @@ OBJ_DIR=obj
 CC=gcc
 CFLAGS=-g -Wall -Wextra -I$(INC_DIR) -MMD -MP
 
-TARGET=$(BIN_DIR)/sml
+TARGET=$(BIN_DIR)/smlc
 SOURCES=$(wildcard $(SRC_DIR)/*.c)
 OBJECTS=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 DEPS=$(OBJECTS:.o=.d)
