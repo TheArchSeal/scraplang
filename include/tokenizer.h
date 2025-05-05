@@ -72,26 +72,27 @@ enum TokenEnum {
     DCOLON,     // ::
     SEMICOLON,  // ;
 
-    VAR,
-    CONST,
-    FN,
-    WIRE,
-    PART,
-    PRIMITIVE,
-    STRUCT,
-    ENUM,
+    VAR_TOKEN,
+    CONST_TOKEN,
+    FN_TOKEN,
+    WIRE_TOKEN,
+    PART_TOKEN,
+    PRIMITIVE_TOKEN,
+    STRUCT_TOKEN,
+    ENUM_TOKEN,
 
-    IF,
-    ELSE,
-    SWITCH,
-    CASE,
-    DEFAULT,
-    WHILE,
-    DO,
-    FOR,
+    IF_TOKEN,
+    ELSE_TOKEN,
+    SWITCH_TOKEN,
+    CASE_TOKEN,
+    DEFAULT_TOKEN,
+    WHILE_TOKEN,
+    DO_TOKEN,
+    FOR_TOKEN,
 
-    NULL_TOKEN,
     TYPE_TOKEN,
+    VOID_TOKEN,
+    BOOL_TOKEN,
     I8_TOKEN,
     I16_TOKEN,
     I32_TOKEN,
@@ -116,7 +117,8 @@ struct Token {
     TokenData data;
 };
 
+Token* tokenize(const char* program, size_t tabsize);
+
+void free_token(Token token);
 void free_token_arr(Token* arr);
 void free_token_arrn(Token* arr, size_t n);
-
-Token* tokenize(const char* program, size_t tabsize, const char* filename);

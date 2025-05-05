@@ -1,3 +1,4 @@
+#include "printerr.h"
 #include "readfile.h"
 #include "tokenizer.h"
 #include <stdlib.h>
@@ -5,8 +6,10 @@
 
 int main(void) {
     const char* filename = "./test.sml";
+    error_filename = filename;
+
     char* program = readfile(filename);
-    Token* tokens = tokenize(program, 8, filename);
+    Token* tokens = tokenize(program, 8);
     free(program);
     if (tokens == NULL) return EXIT_FAILURE;
 

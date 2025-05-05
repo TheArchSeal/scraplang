@@ -5,10 +5,12 @@
 typedef struct ErrorData ErrorData;
 
 struct ErrorData {
-    const char* filename;
     size_t line, col;
 };
 
-int printerr(ErrorData err, const char* format, ...);
-int print_malloc_err(void);
-int print_read_err(const char* filename);
+extern const char* error_filename;
+extern size_t error_supress;
+
+int print_syntax_error(ErrorData err, const char* format, ...);
+int print_malloc_error(void);
+int print_read_error(void);

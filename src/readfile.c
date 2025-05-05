@@ -11,7 +11,7 @@ char* readfile(const char* filename) {
     // open file
     FILE* fp = fopen(filename, "r");
     if (fp == NULL) {
-        print_read_err(filename);
+        print_read_error();
         return NULL;
     }
 
@@ -19,7 +19,7 @@ char* readfile(const char* filename) {
     int failed = fseek(fp, 0, SEEK_END);
     size_t size = ftell(fp);
     if (failed || fseek(fp, 0, SEEK_SET)) {
-        print_read_err(filename);
+        print_read_error();
         fclose(fp);
         return NULL;
     }
@@ -27,14 +27,14 @@ char* readfile(const char* filename) {
     // allocate string
     char* content = malloc(size + 1);
     if (content == NULL) {
-        print_malloc_err();
+        print_malloc_error();
         fclose(fp);
         return NULL;
     }
 
     // read file
     if (size > fread(content, 1, size, fp)) {
-        print_read_err(filename);
+        print_read_error();
         fclose(fp);
         free(content);
         return NULL;

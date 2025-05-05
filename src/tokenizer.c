@@ -65,24 +65,25 @@ bool is_var(const char* str, size_t len) {
 // Find the token type of the keyword str of length len.
 // Returns ERROR_TOKEN if it is not a keyword.
 TokenEnum get_keyword_type(const char* str, size_t len) {
-    if (strncmp(str, "var", len) == 0) return VAR;
-    if (strncmp(str, "const", len) == 0) return CONST;
-    if (strncmp(str, "fn", len) == 0) return FN;
-    if (strncmp(str, "wire", len) == 0) return WIRE;
-    if (strncmp(str, "part", len) == 0) return PART;
-    if (strncmp(str, "primitive", len) == 0) return PRIMITIVE;
-    if (strncmp(str, "struct", len) == 0) return STRUCT;
-    if (strncmp(str, "enum", len) == 0) return ENUM;
-    if (strncmp(str, "if", len) == 0) return IF;
-    if (strncmp(str, "else", len) == 0) return ELSE;
-    if (strncmp(str, "switch", len) == 0) return SWITCH;
-    if (strncmp(str, "case", len) == 0) return CASE;
-    if (strncmp(str, "default", len) == 0) return DEFAULT;
-    if (strncmp(str, "while", len) == 0) return WHILE;
-    if (strncmp(str, "do", len) == 0) return DO;
-    if (strncmp(str, "for", len) == 0) return FOR;
-    if (strncmp(str, "null", len) == 0) return NULL_TOKEN;
+    if (strncmp(str, "var", len) == 0) return VAR_TOKEN;
+    if (strncmp(str, "const", len) == 0) return CONST_TOKEN;
+    if (strncmp(str, "fn", len) == 0) return FN_TOKEN;
+    if (strncmp(str, "wire", len) == 0) return WIRE_TOKEN;
+    if (strncmp(str, "part", len) == 0) return PART_TOKEN;
+    if (strncmp(str, "primitive", len) == 0) return PRIMITIVE_TOKEN;
+    if (strncmp(str, "struct", len) == 0) return STRUCT_TOKEN;
+    if (strncmp(str, "enum", len) == 0) return ENUM_TOKEN;
+    if (strncmp(str, "if", len) == 0) return IF_TOKEN;
+    if (strncmp(str, "else", len) == 0) return ELSE_TOKEN;
+    if (strncmp(str, "switch", len) == 0) return SWITCH_TOKEN;
+    if (strncmp(str, "case", len) == 0) return CASE_TOKEN;
+    if (strncmp(str, "default", len) == 0) return DEFAULT_TOKEN;
+    if (strncmp(str, "while", len) == 0) return WHILE_TOKEN;
+    if (strncmp(str, "do", len) == 0) return DO_TOKEN;
+    if (strncmp(str, "for", len) == 0) return FOR_TOKEN;
     if (strncmp(str, "type", len) == 0) return TYPE_TOKEN;
+    if (strncmp(str, "void", len) == 0) return VOID_TOKEN;
+    if (strncmp(str, "bool", len) == 0) return BOOL_TOKEN;
     if (strncmp(str, "i8", len) == 0) return I8_TOKEN;
     if (strncmp(str, "i16", len) == 0) return I16_TOKEN;
     if (strncmp(str, "i32", len) == 0) return I32_TOKEN;
@@ -192,7 +193,7 @@ bool parse_int(literal_t* dst, const char* src, ErrorData err) {
         if (is_alphanum(*it) && d < base) {
             n = n * base + d;
         } else {
-            printerr(err, "invalid digit '%c' in integer literal '%s'\n", *it, src);
+            print_syntax_error(err, "invalid digit '%c' in integer literal '%s'\n", *it, src);
             return true;
         }
     }
@@ -221,7 +222,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
     // parsed string is never longer
     char* str = malloc(src_len);
     if (str == NULL) {
-        print_malloc_err();
+        print_malloc_error();
         return false;
     }
 
@@ -247,7 +248,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // left digit
                     char hi = *++it;
                     if (hi == '\0') {
-                        printerr(err,
+                        print_syntax_error(err,
                             "invalid escape sequence '\\x' in %s literal %s\n",
                             literal_name(quote), src
                         );
@@ -258,7 +259,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // right digit
                     char lo = *++it;
                     if (hi == '\0') {
-                        printerr(err,
+                        print_syntax_error(err,
                             "invalid escape sequence '\\x%c' in %s literal %s\n",
                             hi, literal_name(quote), src
                         );
@@ -270,7 +271,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     if (is_hex(hi) && is_hex(lo)) {
                         str[i++] = parse_digit(hi) * 16 + parse_digit(lo);
                     } else {
-                        printerr(err,
+                        print_syntax_error(err,
                             "invalid escape sequence '\\x%c%c' in %s literal %s\n",
                             hi, lo, literal_name(quote), src
                         );
@@ -280,7 +281,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     break;
 
                 default: // invalid escape sequence
-                    printerr(err,
+                    print_syntax_error(err,
                         "invalid escape sequence '\\%c' in %s literal %s\n",
                         *it, literal_name(quote), src
                     );
@@ -318,12 +319,12 @@ bool parse_chr(char* dst, const char* src, size_t src_len, ErrorData err) {
 
     // check that length is 1
     if (len < 1) {
-        printerr(err, "empty character literal %s\n", src);
+        print_syntax_error(err, "empty character literal %s\n", src);
         free(str);
         return true;
     }
     if (len > 1) {
-        printerr(err, "multiple characters in character literal %s\n", src);
+        print_syntax_error(err, "multiple characters in character literal %s\n", src);
         free(str);
         return true;
     }
@@ -336,14 +337,14 @@ bool parse_chr(char* dst, const char* src, size_t src_len, ErrorData err) {
 // Tokenize program assuming a tab width of tabsize.
 // Result is terminated by an EOF_TOKEN.
 // Returns NULL if an error occurred.
-Token* tokenize(const char* program, size_t tabsize, const char* filename) {
+Token* tokenize(const char* program, size_t tabsize) {
     if (program == NULL) return NULL;
 
     // initialize array
     size_t length = 0, capacity = 1;
     Token* array = malloc(sizeof(Token) * capacity);
     if (array == NULL) {
-        print_malloc_err();
+        print_malloc_error();
         return NULL;
     }
 
@@ -413,7 +414,7 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
 
                         // hit end of line or file before closing string
                         if (chr == '\0' || (!escaping && chr == '\n')) {
-                            printerr((ErrorData) { filename, tokenline, tokencol },
+                            print_syntax_error((ErrorData) { tokenline, tokencol },
                                 "missing terminating %c character in %s literal %.*s\n",
                                 quote, literal_name(quote), tokenlen, tokenpos
                             );
@@ -450,11 +451,11 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
         if (push_token) {
             // skip empty tokens
             if (tokenlen > 0) {
-                ErrorData err = { filename, tokenline, tokencol };
+                ErrorData err = { tokenline, tokencol };
 
                 // check that token is valid
                 if (tokentype == ERROR_TOKEN) {
-                    printerr(err, "unrecognized token '%.*s'\n", tokenlen, tokenpos);
+                    print_syntax_error(err, "invalid token '%.*s'\n", tokenlen, tokenpos);
                     free_token_arrn(array, length);
                     return NULL;
                 }
@@ -464,7 +465,7 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
                     capacity *= 2;
                     Token* new_array = realloc(array, sizeof(Token) * capacity);
                     if (new_array == NULL) {
-                        print_malloc_err();
+                        print_malloc_error();
                         free_token_arrn(array, length);
                         return NULL;
                     }
@@ -474,7 +475,7 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
                 // copy token to new string
                 char* str = malloc(tokenlen + 1);
                 if (str == NULL) {
-                    print_malloc_err();
+                    print_malloc_error();
                     free_token_arrn(array, length);
                     return NULL;
                 }
@@ -546,28 +547,34 @@ Token* tokenize(const char* program, size_t tabsize, const char* filename) {
     return array;
 }
 
-// Free EOF terminated token array and all token data inside it.
-void free_token_arr(Token* arr) {
-    if (arr == NULL) return;
-    for (Token* it = arr; it->type != EOF_TOKEN; it++) {
-        if (it->type == STR_LITERAL) {
-            free(it->data.str_literal);
-        }
-        free(it->str);
+// Free all data inside token.
+void free_token(Token token) {
+    switch (token.type) {
+        case ERROR_TOKEN:
+        case EOF_TOKEN:
+            break;
+
+        case STR_LITERAL:
+            free(token.str);
+            free(token.data.str_literal);
+            break;
+
+        default:
+            free(token.str);
+            break;
     }
-    free(arr);
 }
 
 // Free token array of length n and all token data inside it.
 void free_token_arrn(Token* arr, size_t n) {
     if (arr == NULL) return;
-    for (size_t i = 0; i < n; i++) {
-        if (arr[i].type == STR_LITERAL) {
-            free(arr[i].data.str_literal);
-        }
-        if (arr[i].type != NULL_TOKEN) {
-            free(arr[i].str);
-        }
-    }
+    for (size_t i = 0; i < n; i++) free_token(arr[i]);
+    free(arr);
+}
+
+// Free EOF terminated token array and all token data inside it.
+void free_token_arr(Token* arr) {
+    if (arr == NULL) return;
+    for (Token* it = arr; it->type != EOF_TOKEN; it++) free_token(*it);
     free(arr);
 }
