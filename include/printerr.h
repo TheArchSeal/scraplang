@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct ErrorData ErrorData;
 
@@ -9,8 +10,9 @@ struct ErrorData {
 };
 
 extern const char* error_filename;
-extern size_t error_supress;
+extern size_t error_suppress;
+extern bool error_indicator;
 
-int print_syntax_error(ErrorData err, const char* format, ...);
-int print_malloc_error(void);
-int print_read_error(void);
+void syntax_error(ErrorData err, const char* format, ...);
+void malloc_error(void);
+void fread_error(void);

@@ -1,7 +1,6 @@
 #include "tokenizer.h"
 #include "printerr.h"
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 
 // Check whether chr is a lowercase letter.
@@ -65,86 +64,86 @@ bool is_var(const char* str, size_t len) {
 // Find the token type of the keyword str of length len.
 // Returns ERROR_TOKEN if it is not a keyword.
 TokenEnum get_keyword_type(const char* str, size_t len) {
-    if (strncmp(str, "var", len) == 0) return VAR_TOKEN;
-    if (strncmp(str, "const", len) == 0) return CONST_TOKEN;
-    if (strncmp(str, "fn", len) == 0) return FN_TOKEN;
-    if (strncmp(str, "wire", len) == 0) return WIRE_TOKEN;
-    if (strncmp(str, "part", len) == 0) return PART_TOKEN;
-    if (strncmp(str, "primitive", len) == 0) return PRIMITIVE_TOKEN;
-    if (strncmp(str, "struct", len) == 0) return STRUCT_TOKEN;
-    if (strncmp(str, "enum", len) == 0) return ENUM_TOKEN;
-    if (strncmp(str, "if", len) == 0) return IF_TOKEN;
-    if (strncmp(str, "else", len) == 0) return ELSE_TOKEN;
-    if (strncmp(str, "switch", len) == 0) return SWITCH_TOKEN;
-    if (strncmp(str, "case", len) == 0) return CASE_TOKEN;
-    if (strncmp(str, "default", len) == 0) return DEFAULT_TOKEN;
-    if (strncmp(str, "while", len) == 0) return WHILE_TOKEN;
-    if (strncmp(str, "do", len) == 0) return DO_TOKEN;
-    if (strncmp(str, "for", len) == 0) return FOR_TOKEN;
-    if (strncmp(str, "type", len) == 0) return TYPE_TOKEN;
-    if (strncmp(str, "void", len) == 0) return VOID_TOKEN;
-    if (strncmp(str, "bool", len) == 0) return BOOL_TOKEN;
-    if (strncmp(str, "i8", len) == 0) return I8_TOKEN;
-    if (strncmp(str, "i16", len) == 0) return I16_TOKEN;
-    if (strncmp(str, "i32", len) == 0) return I32_TOKEN;
-    if (strncmp(str, "i64", len) == 0) return I64_TOKEN;
-    if (strncmp(str, "u8", len) == 0) return U8_TOKEN;
-    if (strncmp(str, "u16", len) == 0) return U16_TOKEN;
-    if (strncmp(str, "u32", len) == 0) return U32_TOKEN;
-    if (strncmp(str, "u64", len) == 0) return U64_TOKEN;
+    if (strlen("var") == len && strncmp(str, "var", len) == 0) return VAR_TOKEN;
+    if (strlen("const") == len && strncmp(str, "const", len) == 0) return CONST_TOKEN;
+    if (strlen("fn") == len && strncmp(str, "fn", len) == 0) return FN_TOKEN;
+    if (strlen("wire") == len && strncmp(str, "wire", len) == 0) return WIRE_TOKEN;
+    if (strlen("part") == len && strncmp(str, "part", len) == 0) return PART_TOKEN;
+    if (strlen("primitive") == len && strncmp(str, "primitive", len) == 0) return PRIMITIVE_TOKEN;
+    if (strlen("struct") == len && strncmp(str, "struct", len) == 0) return STRUCT_TOKEN;
+    if (strlen("enum") == len && strncmp(str, "enum", len) == 0) return ENUM_TOKEN;
+    if (strlen("if") == len && strncmp(str, "if", len) == 0) return IF_TOKEN;
+    if (strlen("else") == len && strncmp(str, "else", len) == 0) return ELSE_TOKEN;
+    if (strlen("switch") == len && strncmp(str, "switch", len) == 0) return SWITCH_TOKEN;
+    if (strlen("case") == len && strncmp(str, "case", len) == 0) return CASE_TOKEN;
+    if (strlen("default") == len && strncmp(str, "default", len) == 0) return DEFAULT_TOKEN;
+    if (strlen("while") == len && strncmp(str, "while", len) == 0) return WHILE_TOKEN;
+    if (strlen("do") == len && strncmp(str, "do", len) == 0) return DO_TOKEN;
+    if (strlen("for") == len && strncmp(str, "for", len) == 0) return FOR_TOKEN;
+    if (strlen("type") == len && strncmp(str, "type", len) == 0) return TYPE_TOKEN;
+    if (strlen("void") == len && strncmp(str, "void", len) == 0) return VOID_TOKEN;
+    if (strlen("bool") == len && strncmp(str, "bool", len) == 0) return BOOL_TOKEN;
+    if (strlen("i8") == len && strncmp(str, "i8", len) == 0) return I8_TOKEN;
+    if (strlen("i16") == len && strncmp(str, "i16", len) == 0) return I16_TOKEN;
+    if (strlen("i32") == len && strncmp(str, "i32", len) == 0) return I32_TOKEN;
+    if (strlen("i64") == len && strncmp(str, "i64", len) == 0) return I64_TOKEN;
+    if (strlen("u8") == len && strncmp(str, "u8", len) == 0) return U8_TOKEN;
+    if (strlen("u16") == len && strncmp(str, "u16", len) == 0) return U16_TOKEN;
+    if (strlen("u32") == len && strncmp(str, "u32", len) == 0) return U32_TOKEN;
+    if (strlen("u64") == len && strncmp(str, "u64", len) == 0) return U64_TOKEN;
     return ERROR_TOKEN;
 }
 
 // Find the token type of the symbol str of length len.
 // Returns ERROR_TOKEN if it is not a symbol.
 TokenEnum get_symbol_type(const char* str, size_t len) {
-    if (strncmp(str, "(", len) == 0) return LPAREN;
-    if (strncmp(str, ")", len) == 0) return RPAREN;
-    if (strncmp(str, "[", len) == 0) return LBRACKET;
-    if (strncmp(str, "]", len) == 0) return RBRACKET;
-    if (strncmp(str, "{", len) == 0) return LBRACE;
-    if (strncmp(str, "}", len) == 0) return RBRACE;
-    if (strncmp(str, "+", len) == 0) return PLUS;
-    if (strncmp(str, "++", len) == 0) return DPLUS;
-    if (strncmp(str, "-", len) == 0) return MINUS;
-    if (strncmp(str, "--", len) == 0) return DMINUS;
-    if (strncmp(str, "*", len) == 0) return STAR;
-    if (strncmp(str, "/", len) == 0) return SLASH;
-    if (strncmp(str, "%", len) == 0) return PERCENT;
-    if (strncmp(str, "|", len) == 0) return PIPE;
-    if (strncmp(str, "||", len) == 0) return DPIPE;
-    if (strncmp(str, "&", len) == 0) return AND;
-    if (strncmp(str, "&&", len) == 0) return DAND;
-    if (strncmp(str, "^", len) == 0) return CARET;
-    if (strncmp(str, "~", len) == 0) return TILDE;
-    if (strncmp(str, "!", len) == 0) return EXCLMARK;
-    if (strncmp(str, "?", len) == 0) return QMARK;
-    if (strncmp(str, "=", len) == 0) return EQ_TOKEN;
-    if (strncmp(str, "==", len) == 0) return DEQ_TOKEN;
-    if (strncmp(str, "!=", len) == 0) return NEQ_TOKEN;
-    if (strncmp(str, "<", len) == 0) return LT_TOKEN;
-    if (strncmp(str, "<<", len) == 0) return DLT_TOKEN;
-    if (strncmp(str, "<=", len) == 0) return LEQ_TOKEN;
-    if (strncmp(str, ">", len) == 0) return GT_TOKEN;
-    if (strncmp(str, ">>", len) == 0) return DGT_TOKEN;
-    if (strncmp(str, ">=", len) == 0) return GEQ_TOKEN;
-    if (strncmp(str, "+=", len) == 0) return PLUSEQ;
-    if (strncmp(str, "-=", len) == 0) return MINUSEQ;
-    if (strncmp(str, "*=", len) == 0) return STAREQ;
-    if (strncmp(str, "/=", len) == 0) return SLASHEQ;
-    if (strncmp(str, "%=", len) == 0) return PERCENTEQ;
-    if (strncmp(str, "|=", len) == 0) return PIPEEQ;
-    if (strncmp(str, "&=", len) == 0) return ANDEQ;
-    if (strncmp(str, "^=", len) == 0) return CARETEQ;
-    if (strncmp(str, "<<=", len) == 0) return DLTEQ;
-    if (strncmp(str, ">>=", len) == 0) return DGTEQ;
-    if (strncmp(str, "->", len) == 0) return ARROW;
-    if (strncmp(str, "=>", len) == 0) return DARROW;
-    if (strncmp(str, ".", len) == 0) return DOT;
-    if (strncmp(str, ",", len) == 0) return COMMA;
-    if (strncmp(str, ":", len) == 0) return COLON;
-    if (strncmp(str, "::", len) == 0) return DCOLON;
-    if (strncmp(str, ";", len) == 0) return SEMICOLON;
+    if (strlen("(") == len && strncmp(str, "(", len) == 0) return LPAREN;
+    if (strlen(")") == len && strncmp(str, ")", len) == 0) return RPAREN;
+    if (strlen("[") == len && strncmp(str, "[", len) == 0) return LBRACKET;
+    if (strlen("]") == len && strncmp(str, "]", len) == 0) return RBRACKET;
+    if (strlen("{") == len && strncmp(str, "{", len) == 0) return LBRACE;
+    if (strlen("}") == len && strncmp(str, "}", len) == 0) return RBRACE;
+    if (strlen("+") == len && strncmp(str, "+", len) == 0) return PLUS;
+    if (strlen("++") == len && strncmp(str, "++", len) == 0) return DPLUS;
+    if (strlen("-") == len && strncmp(str, "-", len) == 0) return MINUS;
+    if (strlen("--") == len && strncmp(str, "--", len) == 0) return DMINUS;
+    if (strlen("*") == len && strncmp(str, "*", len) == 0) return STAR;
+    if (strlen("/") == len && strncmp(str, "/", len) == 0) return SLASH;
+    if (strlen("%") == len && strncmp(str, "%", len) == 0) return PERCENT;
+    if (strlen("|") == len && strncmp(str, "|", len) == 0) return PIPE;
+    if (strlen("||") == len && strncmp(str, "||", len) == 0) return DPIPE;
+    if (strlen("&") == len && strncmp(str, "&", len) == 0) return AND;
+    if (strlen("&&") == len && strncmp(str, "&&", len) == 0) return DAND;
+    if (strlen("^") == len && strncmp(str, "^", len) == 0) return CARET;
+    if (strlen("~") == len && strncmp(str, "~", len) == 0) return TILDE;
+    if (strlen("!") == len && strncmp(str, "!", len) == 0) return EXCLMARK;
+    if (strlen("?") == len && strncmp(str, "?", len) == 0) return QMARK;
+    if (strlen("=") == len && strncmp(str, "=", len) == 0) return EQ_TOKEN;
+    if (strlen("==") == len && strncmp(str, "==", len) == 0) return DEQ_TOKEN;
+    if (strlen("!=") == len && strncmp(str, "!=", len) == 0) return NEQ_TOKEN;
+    if (strlen("<") == len && strncmp(str, "<", len) == 0) return LT_TOKEN;
+    if (strlen("<<") == len && strncmp(str, "<<", len) == 0) return DLT_TOKEN;
+    if (strlen("<=") == len && strncmp(str, "<=", len) == 0) return LEQ_TOKEN;
+    if (strlen(">") == len && strncmp(str, ">", len) == 0) return GT_TOKEN;
+    if (strlen(">>") == len && strncmp(str, ">>", len) == 0) return DGT_TOKEN;
+    if (strlen(">=") == len && strncmp(str, ">=", len) == 0) return GEQ_TOKEN;
+    if (strlen("+=") == len && strncmp(str, "+=", len) == 0) return PLUSEQ;
+    if (strlen("-=") == len && strncmp(str, "-=", len) == 0) return MINUSEQ;
+    if (strlen("*=") == len && strncmp(str, "*=", len) == 0) return STAREQ;
+    if (strlen("/=") == len && strncmp(str, "/=", len) == 0) return SLASHEQ;
+    if (strlen("%=") == len && strncmp(str, "%=", len) == 0) return PERCENTEQ;
+    if (strlen("|=") == len && strncmp(str, "|=", len) == 0) return PIPEEQ;
+    if (strlen("&=") == len && strncmp(str, "&=", len) == 0) return ANDEQ;
+    if (strlen("^=") == len && strncmp(str, "^=", len) == 0) return CARETEQ;
+    if (strlen("<<=") == len && strncmp(str, "<<=", len) == 0) return DLTEQ;
+    if (strlen(">>=") == len && strncmp(str, ">>=", len) == 0) return DGTEQ;
+    if (strlen("->") == len && strncmp(str, "->", len) == 0) return ARROW;
+    if (strlen("=>") == len && strncmp(str, "=>", len) == 0) return DARROW;
+    if (strlen(".") == len && strncmp(str, ".", len) == 0) return DOT;
+    if (strlen(",") == len && strncmp(str, ",", len) == 0) return COMMA;
+    if (strlen(":") == len && strncmp(str, ":", len) == 0) return COLON;
+    if (strlen("::") == len && strncmp(str, "::", len) == 0) return DCOLON;
+    if (strlen(";") == len && strncmp(str, ";", len) == 0) return SEMICOLON;
     return ERROR_TOKEN;
 }
 
@@ -194,7 +193,7 @@ bool parse_int(literal_t* dst, const char* src, ErrorData err) {
         if (is_alphanum(*it) && d < base) {
             n = n * base + d;
         } else {
-            print_syntax_error(err, "invalid digit '%c' in integer literal '%s'\n", *it, src);
+            syntax_error(err, "invalid digit '%c' in integer literal '%s'\n", *it, src);
             return true;
         }
     }
@@ -223,7 +222,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
     // parsed string is never longer
     char* str = malloc(src_len);
     if (str == NULL) {
-        print_malloc_error();
+        malloc_error();
         return false;
     }
 
@@ -249,7 +248,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // left digit
                     char hi = *++it;
                     if (hi == '\0') {
-                        print_syntax_error(err,
+                        syntax_error(err,
                             "invalid escape sequence '\\x' in %s literal %s\n",
                             literal_name(quote), src
                         );
@@ -260,7 +259,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // right digit
                     char lo = *++it;
                     if (hi == '\0') {
-                        print_syntax_error(err,
+                        syntax_error(err,
                             "invalid escape sequence '\\x%c' in %s literal %s\n",
                             hi, literal_name(quote), src
                         );
@@ -272,7 +271,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     if (is_hex(hi) && is_hex(lo)) {
                         str[i++] = parse_digit(hi) * 16 + parse_digit(lo);
                     } else {
-                        print_syntax_error(err,
+                        syntax_error(err,
                             "invalid escape sequence '\\x%c%c' in %s literal %s\n",
                             hi, lo, literal_name(quote), src
                         );
@@ -282,7 +281,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     break;
 
                 default: // invalid escape sequence
-                    print_syntax_error(err,
+                    syntax_error(err,
                         "invalid escape sequence '\\%c' in %s literal %s\n",
                         *it, literal_name(quote), src
                     );
@@ -320,12 +319,12 @@ bool parse_chr(char* dst, const char* src, size_t src_len, ErrorData err) {
 
     // check that length is 1
     if (len < 1) {
-        print_syntax_error(err, "empty character literal %s\n", src);
+        syntax_error(err, "empty character literal %s\n", src);
         free(str);
         return true;
     }
     if (len > 1) {
-        print_syntax_error(err, "multiple characters in character literal %s\n", src);
+        syntax_error(err, "multiple characters in character literal %s\n", src);
         free(str);
         return true;
     }
@@ -345,7 +344,7 @@ Token* tokenize(const char* program, size_t tabsize) {
     size_t length = 0, capacity = 1;
     Token* array = malloc(sizeof(Token) * capacity);
     if (array == NULL) {
-        print_malloc_error();
+        malloc_error();
         return NULL;
     }
 
@@ -415,7 +414,7 @@ Token* tokenize(const char* program, size_t tabsize) {
 
                         // hit end of line or file before closing string
                         if (chr == '\0' || (!escaping && chr == '\n')) {
-                            print_syntax_error((ErrorData) { tokenline, tokencol },
+                            syntax_error((ErrorData) { tokenline, tokencol },
                                 "missing terminating %c character in %s literal %.*s\n",
                                 quote, literal_name(quote), tokenlen, tokenpos
                             );
@@ -456,7 +455,7 @@ Token* tokenize(const char* program, size_t tabsize) {
 
                 // check that token is valid
                 if (tokentype == ERROR_TOKEN) {
-                    print_syntax_error(err, "invalid token '%.*s'\n", tokenlen, tokenpos);
+                    syntax_error(err, "invalid token '%.*s'\n", tokenlen, tokenpos);
                     free_token_arrn(array, length);
                     return NULL;
                 }
@@ -466,7 +465,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                     capacity *= 2;
                     Token* new_array = realloc(array, sizeof(Token) * capacity);
                     if (new_array == NULL) {
-                        print_malloc_error();
+                        malloc_error();
                         free_token_arrn(array, length);
                         return NULL;
                     }
@@ -476,7 +475,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                 // copy token to new string
                 char* str = malloc(tokenlen + 1);
                 if (str == NULL) {
-                    print_malloc_error();
+                    malloc_error();
                     free_token_arrn(array, length);
                     return NULL;
                 }

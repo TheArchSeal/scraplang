@@ -12,18 +12,14 @@ Expr parse_postfix(const Token** it, Expr term);
 Expr parse_term(const Token** it);
 Expr parse_expr(const Token** it, size_t precedence);
 
-int print_unexpected_token(Token token) {
+void unexpected_token(Token token) {
     ErrorData err = { token.line, token.col };
     switch (token.type) {
-        case ERROR_TOKEN: return print_syntax_error(err,
-            "unexpected error\n");
-        case EOF_TOKEN: return print_syntax_error(err,
-            "unexpected end of file\n");
+        case ERROR_TOKEN: return syntax_error(err, "unexpected error\n");
+        case EOF_TOKEN: return syntax_error(err, "unexpected end of file\n");
         case CHR_LITERAL:
-        case STR_LITERAL: return print_syntax_error(err,
-            "unexpected token %s", token.str);
-        default: return print_syntax_error(err,
-            "unexpected token '%s'", token.str);
+        case STR_LITERAL: return syntax_error(err, "unexpected token %s\n", token.str);
+        default: return syntax_error(err, "unexpected token '%s'\n", token.str);
     }
 }
 
@@ -104,6 +100,8 @@ size_t operator_precedence(OpEnum op) {
 
         case COMMA_OP: return 13;
     }
+
+    return 0;
 }
 
 TypeSpec parse_fun_spec(const Token** it) {
@@ -111,7 +109,7 @@ TypeSpec parse_fun_spec(const Token** it) {
 
     Token token = *(*it)++;
     if (token.type != LPAREN) {
-        print_unexpected_token(token);
+        unexpected_token(token);
         return err;
     }
 
@@ -125,7 +123,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             capacity *= 2;
             TypeSpec* new_array = realloc(array, sizeof(TypeSpec) * capacity);
             if (new_array == NULL) {
-                print_malloc_error();
+                malloc_error();
                 free_spec_arrn(array, length);
                 return err;
             }
@@ -143,7 +141,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             (*it)++;
             optional++;
         } else if (optional) {
-            print_syntax_error((ErrorData) { token.line, token.col },
+            syntax_error((ErrorData) { token.line, token.col },
                 "non-optional parameter after optional parameter"
             );
             free_spec_arrn(array, length);
@@ -153,7 +151,7 @@ TypeSpec parse_fun_spec(const Token** it) {
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
-            print_unexpected_token(**it);
+            unexpected_token(**it);
             free_spec_arrn(array, length);
             return err;
         }
@@ -161,7 +159,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     (*it)++;
 
     if ((*it)->type != DARROW) {
-        print_unexpected_token(**it);
+        unexpected_token(**it);
         free_spec_arrn(array, length);
         return err;
     }
@@ -182,7 +180,7 @@ TypeSpec parse_fun_spec(const Token** it) {
 
     spec.data.fun.ret = malloc(sizeof(TypeSpec));
     if (spec.data.fun.ret == NULL) {
-        print_malloc_error();
+        malloc_error();
         free_spec_arrn(array, length);
         free_spec(ret);
         return err;
@@ -202,7 +200,7 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
 
     spec.data.ptr.item_type = malloc(sizeof(TypeSpec));
     if (spec.data.ptr.item_type == NULL) {
-        print_malloc_error();
+        malloc_error();
         return (TypeSpec) { ERROR_SPEC };
     }
     memcpy(spec.data.ptr.item_type, &base, sizeof(TypeSpec));
@@ -225,7 +223,7 @@ TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base) {
                 case LBRACKET: return handle_type_spec_mod(ARR_SPEC, false, it, base);
                 case STAR: return handle_type_spec_mod(PTR_SPEC, false, it, base);
                 default:
-                    print_unexpected_token(**it);
+                    unexpected_token(**it);
                     return (TypeSpec) { ERROR_SPEC };
             }
         default: return base;
@@ -253,9 +251,9 @@ TypeSpec parse_type_spec(const Token** it) {
 
         case LPAREN:
             const Token* branch = *it;
-            error_supress++;
+            error_suppress++;
             spec = parse_fun_spec(it);
-            error_supress--;
+            error_suppress--;
             if (spec.type == ERROR_SPEC) {
                 *it = branch;
 
@@ -264,7 +262,7 @@ TypeSpec parse_type_spec(const Token** it) {
                 if (spec.type == ERROR_SPEC) return spec;
 
                 if ((*it)->type != RPAREN) {
-                    print_unexpected_token(**it);
+                    unexpected_token(**it);
                     free_spec(spec);
                     return (TypeSpec) { ERROR_SPEC };
                 }
@@ -273,7 +271,7 @@ TypeSpec parse_type_spec(const Token** it) {
             return parse_type_spec_mod(it, spec);
 
         default:
-            print_unexpected_token(token);
+            unexpected_token(token);
             return (TypeSpec) { ERROR_SPEC };
     }
 }
@@ -290,7 +288,7 @@ Expr parse_array_literal(const Token** it) {
             capacity *= 2;
             Expr* new_array = realloc(array, sizeof(Expr) * capacity);
             if (new_array == NULL) {
-                print_malloc_error();
+                malloc_error();
                 free_expr_arrn(array, length);
                 return (Expr) { ERROR_EXPR };
             }
@@ -307,7 +305,7 @@ Expr parse_array_literal(const Token** it) {
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RBRACKET) break;
         else {
-            print_unexpected_token(**it);
+            unexpected_token(**it);
             free_expr_arrn(array, length);
             return (Expr) { ERROR_EXPR };
         }
@@ -327,15 +325,15 @@ Expr parse_lambda(const Token** it) {
 
     Token token = *(*it)++;
     if (token.type != LPAREN) {
-        print_unexpected_token(token);
+        unexpected_token(token);
         return err;
     }
 
     size_t length = 0, capacity = 1;
-    Token* name_array = malloc(sizeof(Expr) * capacity);
+    Token* name_array = malloc(sizeof(Token) * capacity);
     TypeSpec* spec_array = malloc(sizeof(TypeSpec) * capacity);
     if (name_array == NULL || spec_array == NULL) {
-        print_malloc_error();
+        malloc_error();
         free(name_array);
         free(spec_array);
         return err;
@@ -347,16 +345,16 @@ Expr parse_lambda(const Token** it) {
             capacity *= 2;
             Token* new_name_array = realloc(name_array, sizeof(Token) * capacity);
             if (new_name_array == NULL) {
-                print_malloc_error();
-                free_token_arrn(name_array, length);
+                malloc_error();
+                free(name_array);
                 free_spec_arrn(spec_array, length);
                 return err;
             }
             name_array = new_name_array;
-            TypeSpec* new_spec_array = realloc(name_array, sizeof(TypeSpec) * capacity);
+            TypeSpec* new_spec_array = realloc(spec_array, sizeof(TypeSpec) * capacity);
             if (new_spec_array == NULL) {
-                print_malloc_error();
-                free_token_arrn(name_array, length);
+                malloc_error();
+                free(name_array);
                 free_spec_arrn(spec_array, length);
                 return err;
             }
@@ -365,8 +363,8 @@ Expr parse_lambda(const Token** it) {
 
         Token name = **it;
         if (name.type != VAR_NAME) {
-            print_unexpected_token(**it);
-            free_token_arrn(name_array, length);
+            unexpected_token(**it);
+            free(name_array);
             free_spec_arrn(spec_array, length);
             return err;
         }
@@ -378,7 +376,7 @@ Expr parse_lambda(const Token** it) {
 
             spec = parse_type_spec(it);
             if (spec.type == ERROR_SPEC) {
-                free_token_arrn(name_array, length);
+                free(name_array);
                 free_spec_arrn(spec_array, length);
                 return err;
             }
@@ -391,8 +389,8 @@ Expr parse_lambda(const Token** it) {
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
-            print_unexpected_token(**it);
-            free_token_arrn(name_array, length);
+            unexpected_token(**it);
+            free(name_array);
             free_spec_arrn(spec_array, length);
             return err;
         }
@@ -405,15 +403,15 @@ Expr parse_lambda(const Token** it) {
 
         ret = parse_type_spec(it);
         if (ret.type == ERROR_SPEC) {
-            free_token_arrn(name_array, length);
+            free(name_array);
             free_spec_arrn(spec_array, length);
             return err;
         }
     }
 
     if ((*it)->type != DARROW) {
-        print_unexpected_token(**it);
-        free_token_arrn(name_array, length);
+        unexpected_token(**it);
+        free(name_array);
         free_spec_arrn(spec_array, length);
         free_spec(ret);
         return err;
@@ -422,7 +420,7 @@ Expr parse_lambda(const Token** it) {
 
     Expr body = parse_expr(it, INITIAL_PRECEDENCE);
     if (body.type == ERROR_EXPR) {
-        free_token_arrn(name_array, length);
+        free(name_array);
         free_spec_arrn(spec_array, length);
         free_spec(ret);
         return body;
@@ -438,8 +436,8 @@ Expr parse_lambda(const Token** it) {
     expr.data.lambda.expr = malloc(sizeof(Expr));
     expr.data.lambda.ret = malloc(sizeof(TypeSpec));
     if (expr.data.lambda.expr == NULL || expr.data.lambda.ret == NULL) {
-        print_malloc_error();
-        free_token_arrn(name_array, length);
+        malloc_error();
+        free(name_array);
         free_spec_arrn(spec_array, length);
         free_spec(ret);
         free_expr(body);
@@ -462,7 +460,7 @@ Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
 
     expr.data.op.first = malloc(sizeof(Expr));
     if (expr.data.op.first == NULL) {
-        print_malloc_error();
+        malloc_error();
         return (Expr) { ERROR_EXPR };
     }
     memcpy(expr.data.op.first, &term, sizeof(Expr));
@@ -490,7 +488,7 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
 
     expr.data.op.first = malloc(sizeof(Expr));
     if (expr.data.op.first == NULL) {
-        print_malloc_error();
+        malloc_error();
         free_expr(term);
         return (Expr) { ERROR_EXPR };
     }
@@ -544,10 +542,11 @@ Expr parse_term(const Token** it) {
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
             const Token* branch = *it;
-            error_supress++;
+            error_suppress++;
             Expr expr = parse_lambda(it);
-            error_supress--;
+            error_suppress--;
             if (expr.type == ERROR_EXPR) {
+                if (error_indicator) return expr;
                 *it = branch;
 
                 (*it)++;
@@ -555,7 +554,7 @@ Expr parse_term(const Token** it) {
                 if (expr.type == ERROR_EXPR) return expr;
 
                 if ((*it)->type != RPAREN) {
-                    print_unexpected_token(**it);
+                    unexpected_token(**it);
                     free_expr(expr);
                     return (Expr) { ERROR_EXPR };
                 }
@@ -563,7 +562,9 @@ Expr parse_term(const Token** it) {
             }
             return parse_postfix(it, expr);
 
-        default: return (Expr) { ERROR_EXPR };
+        default:
+            unexpected_token(**it);
+            return (Expr) { ERROR_EXPR };
     }
 }
 
@@ -587,7 +588,7 @@ Expr parse_expr(const Token** it, size_t precedence) {
         }
 
         if ((*it)->type != COLON) {
-            print_unexpected_token(**it);
+            unexpected_token(**it);
             free_expr(lhs);
             free_expr(middle);
             return (Expr) { ERROR_EXPR };
@@ -609,7 +610,7 @@ Expr parse_expr(const Token** it, size_t precedence) {
     expr.data.op.first = malloc(sizeof(Expr));
     expr.data.op.second = malloc(sizeof(Expr));
     if (expr.data.op.first == NULL || expr.data.op.second == NULL) {
-        print_malloc_error();
+        malloc_error();
         free_expr(lhs);
         if (op == TERNARY) free_expr(middle);
         free_expr(rhs);
@@ -624,7 +625,7 @@ Expr parse_expr(const Token** it, size_t precedence) {
         expr.data.op.third = expr.data.op.second;
         expr.data.op.second = malloc(sizeof(Expr));
         if (expr.data.op.second == NULL) {
-            print_malloc_error();
+            malloc_error();
             free_expr(lhs);
             free_expr(middle);
             free_expr(rhs);
@@ -638,8 +639,83 @@ Expr parse_expr(const Token** it, size_t precedence) {
     return expr;
 }
 
+Stmt parse_stmt(const Token** it) {
+    Stmt stmt;
+    switch ((*it)->type) {
+        case SEMICOLON:
+            stmt.type = NOP;
+            stmt.token = *(*it)++;
+            return stmt;
+
+        default:
+            Expr expr = parse_expr(it, INITIAL_PRECEDENCE);
+            if (expr.type == ERROR_EXPR) return (Stmt) { ERROR_STMT };
+            if ((*it)->type != SEMICOLON) {
+                unexpected_token(**it);
+                free_expr(expr);
+                return (Stmt) { ERROR_STMT };
+            }
+            stmt.type = EXPR_STMT;
+            stmt.token = *(*it)++;
+            stmt.data.expr = expr;
+            return stmt;
+    }
+}
+
+Stmt parse_block(const Token** it, TokenEnum end) {
+    size_t length = 0, capacity = 1;
+    Stmt* array = malloc(sizeof(Stmt) * capacity);
+
+    while ((*it)->type != end) {
+        // expand array when out of capacity
+        if (length >= capacity) {
+            capacity *= 2;
+            Stmt* new_array = realloc(array, sizeof(Stmt) * capacity);
+            if (new_array == NULL) {
+                malloc_error();
+                free_stmt_arrn(array, length);
+                return (Stmt) { ERROR_STMT };
+            }
+            array = new_array;
+        }
+
+        Stmt item = parse_stmt(it);
+        if (item.type == ERROR_STMT) {
+            free_stmt_arrn(array, length);
+            return item;
+        }
+        memcpy(&array[length++], &item, sizeof(Stmt));
+    }
+
+    Stmt stmt;
+    stmt.type = BLOCK;
+    // stmt.token = { ERROR_TOKEN };
+    stmt.data.block.len = length;
+    stmt.data.block.stmts = array;
+    return stmt;
+}
+
 AST* parse(const Token* program) {
-    // TODO
+    if (program == NULL) return NULL;
+
+    const Token** it = &program;
+    Stmt stmt = parse_block(it, EOF_TOKEN);
+    if (stmt.type == ERROR_STMT) return NULL;
+
+    if ((*it)->type != EOF_TOKEN) {
+        unexpected_token(**it);
+        free_stmt(stmt);
+        return NULL;
+    }
+
+    Stmt* ast = malloc(sizeof(Stmt));
+    if (ast == NULL) {
+        malloc_error();
+        free_stmt(stmt);
+        return NULL;
+    }
+    memcpy(ast, &stmt, sizeof(Stmt));
+    return ast;
 }
 
 void free_spec(TypeSpec spec) {
@@ -676,7 +752,7 @@ void free_expr(Expr expr) {
             free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
             break;
         case LAMBDA_EXPR: break;
-            free_token_arrn(expr.data.lambda.paramv, expr.data.lambda.paramc);
+            free(expr.data.lambda.paramv);
             free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
             free_expr(*expr.data.lambda.expr);
             free(expr.data.lambda.expr);
@@ -713,9 +789,26 @@ void free_expr_arrn(Expr* arr, size_t n) {
 }
 
 void free_stmt(Stmt stmt) {
-    // TODO
+    switch (stmt.type) {
+        case ERROR_STMT: break;
+        case NOP: break;
+
+        case BLOCK:
+            free_stmt_arrn(stmt.data.block.stmts, stmt.data.block.len);
+            break;
+        case EXPR_STMT:
+            free_expr(stmt.data.expr);
+            break;
+    }
 }
 
-void free_ast(AST* ast) {
-    // TODO
+void free_stmt_arrn(Stmt* arr, size_t n) {
+    for (size_t i = 0; i < n; i++) free_stmt(arr[i]);
+    free(arr);
+}
+
+void free_ast_p(AST* ast) {
+    if (ast == NULL) return;
+    free_stmt(*ast);
+    free(ast);
 }

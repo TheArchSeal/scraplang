@@ -19,6 +19,8 @@ typedef struct OpExprData OpExprData;
 
 typedef struct Stmt Stmt;
 typedef enum StmtEnum StmtEnum;
+typedef union StmtData StmtData;
+typedef struct BlockStmtData BlockStmtData;
 
 typedef Stmt AST;
 
@@ -144,25 +146,27 @@ struct Expr {
 };
 
 enum StmtEnum {
+    ERROR_STMT,
+
     NOP,
     BLOCK,
     EXPR_STMT,
+};
 
-    DECL,
-    FN_DECL,
-    FN_DEF,
-    BRANCH,
-    SWITCH_STMT,
-    WHILE_STMT,
-    DO_STMT,
-    FOR_STMT,
+struct BlockStmtData {
+    size_t len;
+    Stmt* stmts;
+};
+
+union StmtData {
+    BlockStmtData block;
+    Expr expr;
 };
 
 struct Stmt {
+    StmtEnum type;
     Token token;
-    size_t exprc, stmtc;
-    Expr* exprv;
-    Stmt* stmtv;
+    StmtData data;
 };
 
 AST* parse(const Token* program);
@@ -172,4 +176,5 @@ void free_spec_arrn(TypeSpec* arr, size_t n);
 void free_expr(Expr expr);
 void free_expr_arrn(Expr* arr, size_t n);
 void free_stmt(Stmt stmt);
-void free_ast(AST* ast);
+void free_stmt_arrn(Stmt* arr, size_t n);
+void free_ast_p(AST* ast);
