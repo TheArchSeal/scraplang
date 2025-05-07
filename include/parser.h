@@ -68,6 +68,8 @@ enum ExprEnum {
 };
 
 enum OpEnum {
+    ERROR_OP,
+
     POSTFIX_INC,
     POSTFIX_DEC,
 
@@ -79,6 +81,34 @@ enum OpEnum {
     BINARY_NOT,
     DEREFERENCE,
     ADDRESS_OF,
+
+    MULTIPLICATION,
+    DIVISION,
+    MODULO,
+    ADDITION,
+    SUBTRACTION,
+    LEFT_SHIFT,
+    RIGHT_SHIFT,
+
+    BITWISE_AND,
+    BITWISE_XOR,
+    BITWISE_OR,
+
+    LESS_THAN,
+    LESS_OR_EQUAL,
+    GREATER_THAN,
+    GREATER_OR_EQUAL,
+    EQUAL,
+    NOT_EQUAL,
+
+    LOGICAL_AND,
+    LOGICAL_OR,
+
+    TERNARY,
+
+    ASSIGNMENT,
+
+    COMMA_OP,
 };
 
 struct ArrExprData {

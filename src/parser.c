@@ -3,11 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define INITIAL_PRECEDENCE 14
+
 TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base);
+TypeSpec parse_type_spec(const Token** it);
 
 Expr parse_postfix(const Token** it, Expr term);
 Expr parse_term(const Token** it);
-Expr parse_expr(const Token** it);
+Expr parse_expr(const Token** it, size_t precedence);
 
 int print_unexpected_token(Token token) {
     ErrorData err = { token.line, token.col };
@@ -21,6 +24,85 @@ int print_unexpected_token(Token token) {
             "unexpected token %s", token.str);
         default: return print_syntax_error(err,
             "unexpected token '%s'", token.str);
+    }
+}
+
+OpEnum infix_op_from_token(Token token) {
+    switch (token.type) {
+        case STAR: return MULTIPLICATION;
+        case SLASH: return DIVISION;
+        case PERCENT: return MODULO;
+        case PLUS: return ADDITION;
+        case MINUS: return SUBTRACTION;
+        case DLT_TOKEN: return LEFT_SHIFT;
+        case DGT_TOKEN: return RIGHT_SHIFT;
+
+        case AND: return BITWISE_AND;
+        case CARET: return BITWISE_XOR;
+        case PIPE: return BITWISE_OR;
+
+        case LT_TOKEN: return LESS_THAN;
+        case LEQ_TOKEN: return LESS_OR_EQUAL;
+        case GT_TOKEN: return GREATER_THAN;
+        case GEQ_TOKEN: return GREATER_OR_EQUAL;
+        case DEQ_TOKEN: return EQUAL;
+        case NEQ_TOKEN: return NOT_EQUAL;
+
+        case DAND: return LOGICAL_AND;
+        case DPIPE: return LOGICAL_OR;
+
+        case QMARK: return TERNARY;
+
+        case EQ_TOKEN: return ASSIGNMENT;
+
+        case COMMA: return COMMA_OP;
+
+        default: return ERROR_OP;
+    }
+}
+
+size_t operator_precedence(OpEnum op) {
+    switch (op) {
+        case ERROR_OP: return 0;
+
+        case POSTFIX_INC:
+        case POSTFIX_DEC:
+        case PREFIX_INC:
+        case PREFIX_DEC:
+        case UNARY_PLUS:
+        case UNARY_MINUS:
+        case LOGICAL_NOT:
+        case BINARY_NOT:
+        case DEREFERENCE:
+        case ADDRESS_OF: return 0;
+
+        case MULTIPLICATION:
+        case DIVISION:
+        case MODULO: return 1;
+        case ADDITION:
+        case SUBTRACTION: return 2;
+        case LEFT_SHIFT:
+        case RIGHT_SHIFT: return 3;
+
+        case BITWISE_AND: return 4;
+        case BITWISE_XOR: return 5;
+        case BITWISE_OR: return 6;
+
+        case LESS_THAN:
+        case LESS_OR_EQUAL:
+        case GREATER_THAN:
+        case GREATER_OR_EQUAL: return 7;
+        case EQUAL:
+        case NOT_EQUAL: return 8;
+
+        case LOGICAL_AND: return 9;
+        case LOGICAL_OR: return 10;
+
+        case TERNARY: return 11;
+
+        case ASSIGNMENT: return 12;
+
+        case COMMA_OP: return 13;
     }
 }
 
@@ -85,20 +167,11 @@ TypeSpec parse_fun_spec(const Token** it) {
     }
     (*it)++;
 
-    TypeSpec item = parse_type_spec(it);
-    if (item.type == ERROR_SPEC) {
+    TypeSpec ret = parse_type_spec(it);
+    if (ret.type == ERROR_SPEC) {
         free_spec_arrn(array, length);
-        return item;
+        return ret;
     }
-
-    TypeSpec* ret = malloc(sizeof(TypeSpec));
-    if (ret == NULL) {
-        print_malloc_error();
-        free_spec_arrn(array, length);
-        free_spec(item);
-        return err;
-    }
-    memcpy(ret, &item, sizeof(TypeSpec));
 
     TypeSpec spec;
     spec.type = FUN_SPEC;
@@ -106,29 +179,37 @@ TypeSpec parse_fun_spec(const Token** it) {
     spec.data.fun.paramc = length;
     spec.data.fun.optc = optional;
     spec.data.fun.paramt = array;
-    spec.data.fun.ret = ret;
+
+    spec.data.fun.ret = malloc(sizeof(TypeSpec));
+    if (spec.data.fun.ret == NULL) {
+        print_malloc_error();
+        free_spec_arrn(array, length);
+        free_spec(ret);
+        return err;
+    }
+    memcpy(spec.data.fun.ret, &ret, sizeof(TypeSpec));
+
     return spec;
 }
 
 TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, TypeSpec base) {
     Token token = *(*it)++;
 
-    TypeSpec* inner = malloc(sizeof(TypeSpec));
-    if (inner == NULL) {
-        print_malloc_error();
-        return (TypeSpec) { ERROR_SPEC };
-    }
-    memcpy(inner, &base, sizeof(TypeSpec));
-
     TypeSpec spec;
     spec.type = type;
     spec.token = token;
-    spec.data.ptr.item_type = inner;
     spec.data.ptr.mutable = mut;
+
+    spec.data.ptr.item_type = malloc(sizeof(TypeSpec));
+    if (spec.data.ptr.item_type == NULL) {
+        print_malloc_error();
+        return (TypeSpec) { ERROR_SPEC };
+    }
+    memcpy(spec.data.ptr.item_type, &base, sizeof(TypeSpec));
 
     TypeSpec next = parse_type_spec_mod(it, spec);
     if (next.type == ERROR_SPEC) {
-        free(inner);
+        free_spec(spec);
         return next;
     }
     return next;
@@ -152,6 +233,7 @@ TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base) {
 }
 
 TypeSpec parse_type_spec(const Token** it) {
+    TypeSpec spec;
     switch ((*it)->type) {
         case VOID_TOKEN:
         case BOOL_TOKEN:
@@ -165,7 +247,6 @@ TypeSpec parse_type_spec(const Token** it) {
         case U64_TOKEN:
         case VAR_NAME:
             Token token = *(*it)++;
-            TypeSpec spec;
             spec.type = ATOMIC_SPEC;
             spec.token = token;
             return parse_type_spec_mod(it, spec);
@@ -173,7 +254,7 @@ TypeSpec parse_type_spec(const Token** it) {
         case LPAREN:
             const Token* branch = *it;
             error_supress++;
-            TypeSpec spec = parse_fun_spec(it);
+            spec = parse_fun_spec(it);
             error_supress--;
             if (spec.type == ERROR_SPEC) {
                 *it = branch;
@@ -216,7 +297,7 @@ Expr parse_array_literal(const Token** it) {
             array = new_array;
         }
 
-        Expr item = parse_expr(it);
+        Expr item = parse_expr(it, INITIAL_PRECEDENCE);
         if (item.type == ERROR_EXPR) {
             free_expr_arrn(array, length);
             return item;
@@ -253,20 +334,32 @@ Expr parse_lambda(const Token** it) {
     size_t length = 0, capacity = 1;
     Token* name_array = malloc(sizeof(Expr) * capacity);
     TypeSpec* spec_array = malloc(sizeof(TypeSpec) * capacity);
+    if (name_array == NULL || spec_array == NULL) {
+        print_malloc_error();
+        free(name_array);
+        free(spec_array);
+        return err;
+    }
 
     while ((*it)->type != RPAREN) {
         // expand arrays when out of capacity
         if (length >= capacity) {
             capacity *= 2;
             Token* new_name_array = realloc(name_array, sizeof(Token) * capacity);
-            TypeSpec* new_spec_array = realloc(name_array, sizeof(TypeSpec) * capacity);
-            if (new_name_array == NULL || new_spec_array == NULL) {
+            if (new_name_array == NULL) {
                 print_malloc_error();
                 free_token_arrn(name_array, length);
                 free_spec_arrn(spec_array, length);
                 return err;
             }
             name_array = new_name_array;
+            TypeSpec* new_spec_array = realloc(name_array, sizeof(TypeSpec) * capacity);
+            if (new_spec_array == NULL) {
+                print_malloc_error();
+                free_token_arrn(name_array, length);
+                free_spec_arrn(spec_array, length);
+                return err;
+            }
             spec_array = new_spec_array;
         }
 
@@ -279,7 +372,7 @@ Expr parse_lambda(const Token** it) {
         }
         (*it)++;
 
-        TypeSpec spec = { INFERRED_SPEC };
+        TypeSpec spec = { INFERRED_SPEC, {}, {} };
         if ((*it)->type == COLON) {
             (*it)++;
 
@@ -306,57 +399,34 @@ Expr parse_lambda(const Token** it) {
     }
     (*it)++;
 
-    TypeSpec spec = { INFERRED_SPEC };
+    TypeSpec ret = { INFERRED_SPEC, {}, {} };
     if ((*it)->type == COLON) {
         (*it)++;
 
-        spec = parse_type_spec(it);
-        if (spec.type == ERROR_SPEC) {
+        ret = parse_type_spec(it);
+        if (ret.type == ERROR_SPEC) {
             free_token_arrn(name_array, length);
             free_spec_arrn(spec_array, length);
             return err;
         }
     }
 
-    TypeSpec* ret = malloc(sizeof(TypeSpec));
-    if (ret == NULL) {
-        print_malloc_error();
-        free_token_arrn(name_array, length);
-        free_spec_arrn(spec_array, length);
-        free_spec(spec);
-        return err;
-    }
-
     if ((*it)->type != DARROW) {
         print_unexpected_token(**it);
         free_token_arrn(name_array, length);
         free_spec_arrn(spec_array, length);
-        free_spec(*ret);
-        free(ret);
+        free_spec(ret);
         return err;
     }
     (*it)++;
 
-    Expr item = parse_expr(it);
-    if (item.type == ERROR_EXPR) {
+    Expr body = parse_expr(it, INITIAL_PRECEDENCE);
+    if (body.type == ERROR_EXPR) {
         free_token_arrn(name_array, length);
         free_spec_arrn(spec_array, length);
-        free_spec(*ret);
-        free(ret);
-        return item;
+        free_spec(ret);
+        return body;
     }
-
-    Expr* body = malloc(sizeof(Expr));
-    if (body == NULL) {
-        print_malloc_error();
-        free_token_arrn(name_array, length);
-        free_spec_arrn(spec_array, length);
-        free_spec(*ret);
-        free(ret);
-        free_expr(item);
-        return err;
-    }
-    memcpy(body, &item, sizeof(Expr));
 
     Expr expr;
     expr.type = LAMBDA_EXPR;
@@ -364,30 +434,42 @@ Expr parse_lambda(const Token** it) {
     expr.data.lambda.paramc = length;
     expr.data.lambda.paramv = name_array;
     expr.data.lambda.paramt = spec_array;
-    expr.data.lambda.expr = body;
-    expr.data.lambda.ret = ret;
+
+    expr.data.lambda.expr = malloc(sizeof(Expr));
+    expr.data.lambda.ret = malloc(sizeof(TypeSpec));
+    if (expr.data.lambda.expr == NULL || expr.data.lambda.ret == NULL) {
+        print_malloc_error();
+        free_token_arrn(name_array, length);
+        free_spec_arrn(spec_array, length);
+        free_spec(ret);
+        free_expr(body);
+        free(expr.data.lambda.expr);
+        free(expr.data.lambda.ret);
+    }
+    memcpy(expr.data.lambda.expr, &body, sizeof(Expr));
+    memcpy(expr.data.lambda.ret, &ret, sizeof(TypeSpec));
+
     return expr;
 }
 
 Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
     Token token = *(*it)++;
 
-    Expr* inner = malloc(sizeof(Expr));
-    if (inner == NULL) {
-        print_malloc_error();
-        return (Expr) { ERROR_EXPR };
-    }
-    memcpy(inner, &term, sizeof(Expr));
-
     Expr expr;
     expr.type = UNOP_EXPR;
     expr.token = token;
     expr.data.op.type = type;
-    expr.data.op.first = inner;
+
+    expr.data.op.first = malloc(sizeof(Expr));
+    if (expr.data.op.first == NULL) {
+        print_malloc_error();
+        return (Expr) { ERROR_EXPR };
+    }
+    memcpy(expr.data.op.first, &term, sizeof(Expr));
 
     Expr next = parse_postfix(it, expr);
     if (next.type == ERROR_EXPR) {
-        free(inner);
+        free_expr(expr);
         return next;
     }
     return next;
@@ -401,19 +483,19 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
         return term;
     }
 
-    Expr* inner = malloc(sizeof(Expr));
-    if (inner == NULL) {
-        print_malloc_error();
-        free_expr(term);
-        return (Expr) { ERROR_EXPR };
-    }
-    memcpy(inner, &term, sizeof(Expr));
-
     Expr expr;
     expr.type = UNOP_EXPR;
     expr.token = token;
     expr.data.op.type = type;
-    expr.data.op.first = inner;
+
+    expr.data.op.first = malloc(sizeof(Expr));
+    if (expr.data.op.first == NULL) {
+        print_malloc_error();
+        free_expr(term);
+        return (Expr) { ERROR_EXPR };
+    }
+    memcpy(expr.data.op.first, &term, sizeof(Expr));
+
     return expr;
 }
 
@@ -469,7 +551,7 @@ Expr parse_term(const Token** it) {
                 *it = branch;
 
                 (*it)++;
-                expr = parse_expr(it);
+                expr = parse_expr(it, INITIAL_PRECEDENCE);
                 if (expr.type == ERROR_EXPR) return expr;
 
                 if ((*it)->type != RPAREN) {
@@ -485,8 +567,75 @@ Expr parse_term(const Token** it) {
     }
 }
 
-Expr parse_expr(const Token** it) {
-    // TODO
+Expr parse_expr(const Token** it, size_t precedence) {
+    if (precedence == 0) return parse_term(it);
+
+    Expr lhs = parse_expr(it, precedence - 1);
+    if (lhs.type == ERROR_EXPR) return lhs;
+
+    Token token = **it;
+    OpEnum op = infix_op_from_token(token);
+    if (op == ERROR_OP || operator_precedence(op) >= precedence) return lhs;
+    (*it)++;
+
+    Expr middle;
+    if (op == TERNARY) {
+        middle = parse_expr(it, INITIAL_PRECEDENCE);
+        if (middle.type == ERROR_EXPR) {
+            free_expr(lhs);
+            return middle;
+        }
+
+        if ((*it)->type != COLON) {
+            print_unexpected_token(**it);
+            free_expr(lhs);
+            free_expr(middle);
+            return (Expr) { ERROR_EXPR };
+        }
+        (*it)++;
+    }
+
+    Expr rhs = parse_expr(it, precedence - 1);
+    if (rhs.type == ERROR_EXPR) {
+        free_expr(lhs);
+        if (op == TERNARY) free_expr(middle);
+        return rhs;
+    }
+
+    Expr expr;
+    expr.type = op == TERNARY ? TERNOP_EXPR : BINOP_EXPR;
+    expr.token = token;
+
+    expr.data.op.first = malloc(sizeof(Expr));
+    expr.data.op.second = malloc(sizeof(Expr));
+    if (expr.data.op.first == NULL || expr.data.op.second == NULL) {
+        print_malloc_error();
+        free_expr(lhs);
+        if (op == TERNARY) free_expr(middle);
+        free_expr(rhs);
+        free(expr.data.op.first);
+        free(expr.data.op.second);
+        return (Expr) { ERROR_EXPR };
+    }
+    memcpy(expr.data.op.first, &lhs, sizeof(Expr));
+    memcpy(expr.data.op.second, &rhs, sizeof(Expr));
+
+    if (op == TERNARY) {
+        expr.data.op.third = expr.data.op.second;
+        expr.data.op.second = malloc(sizeof(Expr));
+        if (expr.data.op.second == NULL) {
+            print_malloc_error();
+            free_expr(lhs);
+            free_expr(middle);
+            free_expr(rhs);
+            free(expr.data.op.first);
+            free(expr.data.op.third);
+            return (Expr) { ERROR_EXPR };
+        }
+        memcpy(expr.data.op.second, &middle, sizeof(Expr));
+    }
+
+    return expr;
 }
 
 AST* parse(const Token* program) {

@@ -43,14 +43,15 @@ enum TokenEnum {
     EXCLMARK,   // !
     QMARK,      // ?
 
-    EQ,         // =
-    DEQ,        // ==
-    LT,         // <
-    DLT,        // <<
-    LEQ,        // <=
-    GT,         // >
-    DGT,        // >>
-    GEQ,        // >=
+    EQ_TOKEN,   // =
+    DEQ_TOKEN,  // ==
+    NEQ_TOKEN,  // !=
+    LT_TOKEN,   // <
+    DLT_TOKEN,  // <<
+    LEQ_TOKEN,  // <=
+    GT_TOKEN,   // >
+    DGT_TOKEN,  // >>
+    GEQ_TOKEN,  // >=
 
     PLUSEQ,     // +=
     MINUSEQ,    // -=
