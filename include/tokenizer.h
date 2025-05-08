@@ -119,4 +119,4 @@ struct Token {
 };
 
 Token* tokenize(const char* program, size_t tabsize);
-void free_token_arrn(Token* arr, size_t n);
+void free_token_arr(Token* arr);

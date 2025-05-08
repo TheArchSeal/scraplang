@@ -4,7 +4,7 @@
 #include <string.h>
 
 void free_token(Token token);
-void free_token_arr(Token* arr);
+void free_token_arrn(Token* arr, size_t n);
 
 // Check whether chr is a lowercase letter.
 bool is_lower(char chr) {
@@ -173,7 +173,7 @@ literal_t parse_digit(char chr) {
 // Find the value of the integer literal src.
 // Result is stored in dst unless dst is NULL.
 // Returns whether an error occurred.
-bool parse_int(literal_t* dst, const char* src, ErrorData err) {
+bool parse_int(literal_t* dst, const char* src) {
     if (src == NULL) return true;
     const char* it = src;
 
@@ -196,7 +196,7 @@ bool parse_int(literal_t* dst, const char* src, ErrorData err) {
         if (is_alphanum(*it) && d < base) {
             n = n * base + d;
         } else {
-            syntax_error(err, "invalid digit '%c' in integer literal '%s'\n", *it, src);
+            syntax_error("invalid digit '%c' in integer literal '%s'\n", *it, src);
             return true;
         }
     }
@@ -219,7 +219,7 @@ const char* literal_name(char quote) {
 // Result is stored in dst unless dst is NULL.
 // Result length is stored in dst_len unless dst_len is NULL.
 // Returns whether an error occurred.
-bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, ErrorData err) {
+bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
     if (src == NULL) return true;
 
     // parsed string is never longer
@@ -251,7 +251,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // left digit
                     char hi = *++it;
                     if (hi == '\0') {
-                        syntax_error(err,
+                        syntax_error(
                             "invalid escape sequence '\\x' in %s literal %s\n",
                             literal_name(quote), src
                         );
@@ -262,7 +262,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     // right digit
                     char lo = *++it;
                     if (hi == '\0') {
-                        syntax_error(err,
+                        syntax_error(
                             "invalid escape sequence '\\x%c' in %s literal %s\n",
                             hi, literal_name(quote), src
                         );
@@ -274,7 +274,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     if (is_hex(hi) && is_hex(lo)) {
                         str[i++] = parse_digit(hi) * 16 + parse_digit(lo);
                     } else {
-                        syntax_error(err,
+                        syntax_error(
                             "invalid escape sequence '\\x%c%c' in %s literal %s\n",
                             hi, lo, literal_name(quote), src
                         );
@@ -284,7 +284,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
                     break;
 
                 default: // invalid escape sequence
-                    syntax_error(err,
+                    syntax_error(
                         "invalid escape sequence '\\%c' in %s literal %s\n",
                         *it, literal_name(quote), src
                     );
@@ -313,21 +313,21 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len, Err
 // The character literal must begin and end with a quote character.
 // Result is stored in dst unless dst is NULL.
 // Returns whether an error occurred.
-bool parse_chr(char* dst, const char* src, size_t src_len, ErrorData err) {
+bool parse_chr(char* dst, const char* src, size_t src_len) {
     // parse like string literal
     char* str;
     size_t len;
-    bool failed = parse_str(&str, &len, src, src_len, err);
+    bool failed = parse_str(&str, &len, src, src_len);
     if (failed) return true;
 
     // check that length is 1
     if (len < 1) {
-        syntax_error(err, "empty character literal %s\n", src);
+        syntax_error("empty character literal %s\n", src);
         free(str);
         return true;
     }
     if (len > 1) {
-        syntax_error(err, "multiple characters in character literal %s\n", src);
+        syntax_error("multiple characters in character literal %s\n", src);
         free(str);
         return true;
     }
@@ -417,7 +417,9 @@ Token* tokenize(const char* program, size_t tabsize) {
 
                         // hit end of line or file before closing string
                         if (chr == '\0' || (!escaping && chr == '\n')) {
-                            syntax_error((ErrorData) { tokenline, tokencol },
+                            error_line = tokenline;
+                            error_col = tokencol;
+                            syntax_error(
                                 "missing terminating %c character in %s literal %.*s\n",
                                 quote, literal_name(quote), tokenlen, tokenpos
                             );
@@ -454,11 +456,12 @@ Token* tokenize(const char* program, size_t tabsize) {
         if (push_token) {
             // skip empty tokens
             if (tokenlen > 0) {
-                ErrorData err = { tokenline, tokencol };
+                error_line = tokenline;
+                error_col = tokencol;
 
                 // check that token is valid
                 if (tokentype == ERROR_TOKEN) {
-                    syntax_error(err, "invalid token '%.*s'\n", tokenlen, tokenpos);
+                    syntax_error("invalid token '%.*s'\n", tokenlen, tokenpos);
                     free_token_arrn(array, length);
                     return NULL;
                 }
@@ -489,21 +492,21 @@ Token* tokenize(const char* program, size_t tabsize) {
                 TokenData data;
                 switch (tokentype) {
                     case INT_LITERAL:
-                        if (parse_int(&data.int_literal, str, err)) {
+                        if (parse_int(&data.int_literal, str)) {
                             free_token_arrn(array, length);
                             free(str);
                             return NULL;
                         }
                         break;
                     case CHR_LITERAL:
-                        if (parse_chr(&data.chr_literal, str, tokenlen, err)) {
+                        if (parse_chr(&data.chr_literal, str, tokenlen)) {
                             free_token_arrn(array, length);
                             free(str);
                             return NULL;
                         }
                         break;
                     case STR_LITERAL:
-                        if (parse_str(&data.str_literal, NULL, str, tokenlen, err)) {
+                        if (parse_str(&data.str_literal, NULL, str, tokenlen)) {
                             free_token_arrn(array, length);
                             free(str);
                             return NULL;

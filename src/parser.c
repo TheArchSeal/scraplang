@@ -22,13 +22,14 @@ void free_stmt_arrn(Stmt* arr, size_t n);
 
 // Write error message to stderr.
 void unexpected_token(Token token) {
-    ErrorData err = { token.line, token.col };
+    error_line = token.line;
+    error_col = token.col;
     switch (token.type) {
-        case ERROR_TOKEN: return syntax_error(err, "unexpected error\n");
-        case EOF_TOKEN: return syntax_error(err, "unexpected end of file\n");
+        case ERROR_TOKEN: return syntax_error("unexpected error\n");
+        case EOF_TOKEN: return syntax_error("unexpected end of file\n");
         case CHR_LITERAL:
-        case STR_LITERAL: return syntax_error(err, "unexpected token %s\n", token.str);
-        default: return syntax_error(err, "unexpected token '%s'\n", token.str);
+        case STR_LITERAL: return syntax_error("unexpected token %s\n", token.str);
+        default: return syntax_error("unexpected token '%s'\n", token.str);
     }
 }
 
@@ -170,9 +171,9 @@ TypeSpec parse_fun_spec(const Token** it) {
             (*it)++;
             optional++;
         } else if (optional) {
-            syntax_error((ErrorData) { token.line, token.col },
-                "non-optional parameter after optional parameter"
-            );
+            error_line = token.line;
+            error_col = token.col;
+            syntax_error("non-optional parameter after optional parameter");
             free_spec_arrn(array, length);
             return err;
         }

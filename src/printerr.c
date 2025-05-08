@@ -2,18 +2,21 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-const char* error_filename = NULL;
 size_t error_suppress = 0;
 bool error_indicator = false;
 
-// Write error data and formatted output to stderr.
+const char* error_filename = NULL;
+size_t error_line = 0, error_col = 0;
+
+
+// Write error and formatted output to stderr.
 // Can be suppressed.
-void syntax_error(ErrorData err, const char* format, ...) {
+void syntax_error(const char* format, ...) {
     if (error_suppress) return;
 
     va_list args;
     va_start(args, format);
-    fprintf(stderr, "%s:%zu:%zu: syntax error: ", error_filename, err.line, err.col);
+    fprintf(stderr, "%s:%zu:%zu: syntax error: ", error_filename, error_line, error_col);
     vfprintf(stderr, format, args);
     error_indicator = true;
 }
