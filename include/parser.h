@@ -170,11 +170,4 @@ struct Stmt {
 };
 
 AST* parse(const Token* program);
-
-void free_spec(TypeSpec spec);
-void free_spec_arrn(TypeSpec* arr, size_t n);
-void free_expr(Expr expr);
-void free_expr_arrn(Expr* arr, size_t n);
-void free_stmt(Stmt stmt);
-void free_stmt_arrn(Stmt* arr, size_t n);
 void free_ast_p(AST* ast);

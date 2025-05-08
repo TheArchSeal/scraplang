@@ -24,7 +24,7 @@ void malloc_error(void) {
     error_indicator = true;
 }
 
-// Write error data and message to stderr.
+// Write error message to stderr.
 void fread_error(void) {
     fprintf(stderr, "%s: error: cannot read file\n", error_filename);
     error_indicator = true;

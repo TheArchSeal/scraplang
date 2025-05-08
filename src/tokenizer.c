@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+void free_token(Token token);
+void free_token_arr(Token* arr);
+
 // Check whether chr is a lowercase letter.
 bool is_lower(char chr) {
     return 'a' <= chr && chr <= 'z';

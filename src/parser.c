@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INITIAL_PRECEDENCE 14
+// initial precedence for parse_expr
+#define MAX_PRECEDENCE 13
 
 TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base);
 TypeSpec parse_type_spec(const Token** it);
@@ -12,6 +13,14 @@ Expr parse_postfix(const Token** it, Expr term);
 Expr parse_term(const Token** it);
 Expr parse_expr(const Token** it, size_t precedence);
 
+void free_spec(TypeSpec spec);
+void free_spec_arrn(TypeSpec* arr, size_t n);
+void free_expr(Expr expr);
+void free_expr_arrn(Expr* arr, size_t n);
+void free_stmt(Stmt stmt);
+void free_stmt_arrn(Stmt* arr, size_t n);
+
+// Write error message to stderr.
 void unexpected_token(Token token) {
     ErrorData err = { token.line, token.col };
     switch (token.type) {
@@ -23,6 +32,7 @@ void unexpected_token(Token token) {
     }
 }
 
+// Find the binary or ternary operation based on token.
 OpEnum infix_op_from_token(Token token) {
     switch (token.type) {
         case STAR: return MULTIPLICATION;
@@ -57,6 +67,7 @@ OpEnum infix_op_from_token(Token token) {
     }
 }
 
+// Get the operator precedence of op.
 size_t operator_precedence(OpEnum op) {
     switch (op) {
         case ERROR_OP: return 0;
@@ -104,18 +115,34 @@ size_t operator_precedence(OpEnum op) {
     return 0;
 }
 
+// Whether precedence is right-to-left associative
+bool operator_rtl_associative(size_t precedence) {
+    return precedence == 11
+        || precedence == 12;
+}
+
 TypeSpec parse_fun_spec(const Token** it) {
+    // (a, b?) => c
+
     TypeSpec err = { ERROR_SPEC };
 
-    Token token = *(*it)++;
+    // opening parenthesis
+    Token token = **it;
     if (token.type != LPAREN) {
         unexpected_token(token);
         return err;
     }
+    (*it)++;
 
+    // initialize array
     size_t length = 0, capacity = 1;
     TypeSpec* array = malloc(sizeof(TypeSpec) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return err;
+    }
 
+    // number of optional parameters
     size_t optional = 0;
     while ((*it)->type != RPAREN) {
         // expand array when out of capacity
@@ -130,6 +157,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             array = new_array;
         }
 
+        // next parameter type
         TypeSpec item = parse_type_spec(it);
         if (item.type == ERROR_SPEC) {
             free_spec_arrn(array, length);
@@ -137,6 +165,7 @@ TypeSpec parse_fun_spec(const Token** it) {
         }
         memcpy(&array[length++], &item, sizeof(TypeSpec));
 
+        // optionally an optional parameter
         if ((*it)->type == QMARK) {
             (*it)++;
             optional++;
@@ -148,6 +177,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             return err;
         }
 
+        // (possibly trailing) comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
@@ -158,6 +188,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     }
     (*it)++;
 
+    // => token
     if ((*it)->type != DARROW) {
         unexpected_token(**it);
         free_spec_arrn(array, length);
@@ -165,6 +196,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     }
     (*it)++;
 
+    // return type
     TypeSpec ret = parse_type_spec(it);
     if (ret.type == ERROR_SPEC) {
         free_spec_arrn(array, length);
@@ -205,6 +237,7 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
     }
     memcpy(spec.data.ptr.item_type, &base, sizeof(TypeSpec));
 
+    // may have another modification
     TypeSpec next = parse_type_spec_mod(it, spec);
     if (next.type == ERROR_SPEC) {
         free_spec(spec);
@@ -215,9 +248,11 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
 
 TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base) {
     switch ((*it)->type) {
+        // regular modifier
         case LBRACKET: return handle_type_spec_mod(ARR_SPEC, true, it, base);
         case STAR: return handle_type_spec_mod(PTR_SPEC, true, it, base);
-        case CONST_TOKEN:
+
+        case CONST_TOKEN: // const modifier
             (*it)++;
             switch ((*it)->type) {
                 case LBRACKET: return handle_type_spec_mod(ARR_SPEC, false, it, base);
@@ -226,13 +261,15 @@ TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base) {
                     unexpected_token(**it);
                     return (TypeSpec) { ERROR_SPEC };
             }
-        default: return base;
+
+        default: return base; // no modifier
     }
 }
 
 TypeSpec parse_type_spec(const Token** it) {
     TypeSpec spec;
     switch ((*it)->type) {
+        // atomic types
         case VOID_TOKEN:
         case BOOL_TOKEN:
         case I8_TOKEN:
@@ -250,6 +287,7 @@ TypeSpec parse_type_spec(const Token** it) {
             return parse_type_spec_mod(it, spec);
 
         case LPAREN:
+            // try function type specifier
             const Token* branch = *it;
             error_suppress++;
             spec = parse_fun_spec(it);
@@ -257,6 +295,7 @@ TypeSpec parse_type_spec(const Token** it) {
             if (spec.type == ERROR_SPEC) {
                 *it = branch;
 
+                // else type specifier grouped by parentheses
                 (*it)++;
                 spec = parse_type_spec(it);
                 if (spec.type == ERROR_SPEC) return spec;
@@ -277,10 +316,17 @@ TypeSpec parse_type_spec(const Token** it) {
 }
 
 Expr parse_array_literal(const Token** it) {
+    // [x, y, z]
+
     Token token = *(*it)++;
 
+    // initialize array
     size_t length = 0, capacity = 1;
     Expr* array = malloc(sizeof(Expr) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return (Expr) { ERROR_EXPR };
+    }
 
     while ((*it)->type != RBRACKET) {
         // expand array when out of capacity
@@ -295,13 +341,15 @@ Expr parse_array_literal(const Token** it) {
             array = new_array;
         }
 
-        Expr item = parse_expr(it, INITIAL_PRECEDENCE);
+        // element in array
+        Expr item = parse_expr(it, MAX_PRECEDENCE);
         if (item.type == ERROR_EXPR) {
             free_expr_arrn(array, length);
             return item;
         }
         memcpy(&array[length++], &item, sizeof(Expr));
 
+        // (possibly trailing) comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RBRACKET) break;
         else {
@@ -321,14 +369,19 @@ Expr parse_array_literal(const Token** it) {
 }
 
 Expr parse_lambda(const Token** it) {
+    // (x, y: a): b => z
+
     Expr err = { ERROR_EXPR };
 
-    Token token = *(*it)++;
+    // opening parenthesis
+    Token token = **it;
     if (token.type != LPAREN) {
         unexpected_token(token);
         return err;
     }
+    (*it)++;
 
+    // initialize arrays
     size_t length = 0, capacity = 1;
     Token* name_array = malloc(sizeof(Token) * capacity);
     TypeSpec* spec_array = malloc(sizeof(TypeSpec) * capacity);
@@ -361,6 +414,7 @@ Expr parse_lambda(const Token** it) {
             spec_array = new_spec_array;
         }
 
+        // next parameter name
         Token name = **it;
         if (name.type != VAR_NAME) {
             unexpected_token(**it);
@@ -370,6 +424,7 @@ Expr parse_lambda(const Token** it) {
         }
         (*it)++;
 
+        // optional parameter type specifier
         TypeSpec spec = { INFERRED_SPEC, {}, {} };
         if ((*it)->type == COLON) {
             (*it)++;
@@ -382,10 +437,12 @@ Expr parse_lambda(const Token** it) {
             }
         }
 
+        // push to arrays
         memcpy(&name_array[length], &name, sizeof(Token));
         memcpy(&spec_array[length], &spec, sizeof(TypeSpec));
         length++;
 
+        // (possibly trailing) comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
@@ -397,6 +454,7 @@ Expr parse_lambda(const Token** it) {
     }
     (*it)++;
 
+    // optional return type specifier
     TypeSpec ret = { INFERRED_SPEC, {}, {} };
     if ((*it)->type == COLON) {
         (*it)++;
@@ -409,6 +467,7 @@ Expr parse_lambda(const Token** it) {
         }
     }
 
+    // => token
     if ((*it)->type != DARROW) {
         unexpected_token(**it);
         free(name_array);
@@ -418,7 +477,8 @@ Expr parse_lambda(const Token** it) {
     }
     (*it)++;
 
-    Expr body = parse_expr(it, INITIAL_PRECEDENCE);
+    // lambda body
+    Expr body = parse_expr(it, MAX_PRECEDENCE);
     if (body.type == ERROR_EXPR) {
         free(name_array);
         free_spec_arrn(spec_array, length);
@@ -465,6 +525,7 @@ Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
     }
     memcpy(expr.data.op.first, &term, sizeof(Expr));
 
+    // may have another postfix operator
     Expr next = parse_postfix(it, expr);
     if (next.type == ERROR_EXPR) {
         free_expr(expr);
@@ -476,6 +537,7 @@ Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
 Expr handle_unary_prefix(OpEnum type, const Token** it) {
     Token token = *(*it)++;
 
+    // operand
     Expr term = parse_term(it);
     if (term.type == ERROR_EXPR) {
         return term;
@@ -525,6 +587,7 @@ Expr parse_postfix(const Token** it, Expr term) {
 
 Expr parse_term(const Token** it) {
     switch ((*it)->type) {
+        // atom
         case INT_LITERAL:
         case CHR_LITERAL:
         case STR_LITERAL: return handle_atomic_term(LITERAL_EXPR, it);
@@ -541,6 +604,7 @@ Expr parse_term(const Token** it) {
 
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
+            // try lambda expression
             const Token* branch = *it;
             error_suppress++;
             Expr expr = parse_lambda(it);
@@ -549,8 +613,9 @@ Expr parse_term(const Token** it) {
                 if (error_indicator) return expr;
                 *it = branch;
 
+                // else expression grouped by parentheses
                 (*it)++;
-                expr = parse_expr(it, INITIAL_PRECEDENCE);
+                expr = parse_expr(it, MAX_PRECEDENCE);
                 if (expr.type == ERROR_EXPR) return expr;
 
                 if ((*it)->type != RPAREN) {
@@ -571,85 +636,105 @@ Expr parse_term(const Token** it) {
 Expr parse_expr(const Token** it, size_t precedence) {
     if (precedence == 0) return parse_term(it);
 
+    // whether current precedence is left-to-right associative
+    bool right_to_left = operator_rtl_associative(precedence);
+    // leftmost operand
+    // must only contain operators of lesser precedence
     Expr lhs = parse_expr(it, precedence - 1);
     if (lhs.type == ERROR_EXPR) return lhs;
 
-    Token token = **it;
-    OpEnum op = infix_op_from_token(token);
-    if (op == ERROR_OP || operator_precedence(op) >= precedence) return lhs;
-    (*it)++;
-
-    Expr middle;
-    if (op == TERNARY) {
-        middle = parse_expr(it, INITIAL_PRECEDENCE);
-        if (middle.type == ERROR_EXPR) {
-            free_expr(lhs);
-            return middle;
-        }
-
-        if ((*it)->type != COLON) {
-            unexpected_token(**it);
-            free_expr(lhs);
-            free_expr(middle);
-            return (Expr) { ERROR_EXPR };
-        }
+    for (;;) {
+        Token token = **it;
+        OpEnum op = infix_op_from_token(token);
+        // check if operation should be handled in this recursive step
+        if (op == ERROR_OP || operator_precedence(op) > precedence) return lhs;
         (*it)++;
-    }
 
-    Expr rhs = parse_expr(it, precedence - 1);
-    if (rhs.type == ERROR_EXPR) {
-        free_expr(lhs);
-        if (op == TERNARY) free_expr(middle);
-        return rhs;
-    }
+        // whether operation is ternary
+        bool ternary = op == TERNARY;
+        Expr middle;
+        if (ternary) {
+            // middle operator is unaffected by precedence
+            middle = parse_expr(it, MAX_PRECEDENCE);
+            if (middle.type == ERROR_EXPR) {
+                free_expr(lhs);
+                return middle;
+            }
 
-    Expr expr;
-    expr.type = op == TERNARY ? TERNOP_EXPR : BINOP_EXPR;
-    expr.token = token;
+            if ((*it)->type != COLON) {
+                unexpected_token(**it);
+                free_expr(lhs);
+                free_expr(middle);
+                return (Expr) { ERROR_EXPR };
+            }
+            (*it)++;
+        }
 
-    expr.data.op.first = malloc(sizeof(Expr));
-    expr.data.op.second = malloc(sizeof(Expr));
-    if (expr.data.op.first == NULL || expr.data.op.second == NULL) {
-        malloc_error();
-        free_expr(lhs);
-        if (op == TERNARY) free_expr(middle);
-        free_expr(rhs);
-        free(expr.data.op.first);
-        free(expr.data.op.second);
-        return (Expr) { ERROR_EXPR };
-    }
-    memcpy(expr.data.op.first, &lhs, sizeof(Expr));
-    memcpy(expr.data.op.second, &rhs, sizeof(Expr));
+        // rightmost operand
+        // can contain the same precedence operator iff right-to-left associative
+        Expr rhs = parse_expr(it, precedence - !right_to_left);
+        if (rhs.type == ERROR_EXPR) {
+            free_expr(lhs);
+            if (ternary) free_expr(middle);
+            return rhs;
+        }
 
-    if (op == TERNARY) {
-        expr.data.op.third = expr.data.op.second;
+        Expr expr;
+        expr.type = ternary ? TERNOP_EXPR : BINOP_EXPR;
+        expr.token = token;
+
+        expr.data.op.first = malloc(sizeof(Expr));
         expr.data.op.second = malloc(sizeof(Expr));
-        if (expr.data.op.second == NULL) {
+        if (expr.data.op.first == NULL || expr.data.op.second == NULL) {
             malloc_error();
             free_expr(lhs);
-            free_expr(middle);
+            if (ternary) free_expr(middle);
             free_expr(rhs);
             free(expr.data.op.first);
-            free(expr.data.op.third);
+            free(expr.data.op.second);
             return (Expr) { ERROR_EXPR };
         }
-        memcpy(expr.data.op.second, &middle, sizeof(Expr));
-    }
+        memcpy(expr.data.op.first, &lhs, sizeof(Expr));
+        memcpy(expr.data.op.second, &rhs, sizeof(Expr));
 
-    return expr;
+        // rightmost operand is third and middle is second if ternary
+        if (ternary) {
+            expr.data.op.third = expr.data.op.second;
+            expr.data.op.second = malloc(sizeof(Expr));
+            if (expr.data.op.second == NULL) {
+                malloc_error();
+                free_expr(lhs);
+                free_expr(middle);
+                free_expr(rhs);
+                free(expr.data.op.first);
+                free(expr.data.op.third);
+                return (Expr) { ERROR_EXPR };
+            }
+            memcpy(expr.data.op.second, &middle, sizeof(Expr));
+        }
+
+        // right-to-left will be done here but left-to-right must loop
+        // to parse next term for this precedence level
+        if (right_to_left) {
+            return expr;
+        } else {
+            lhs = expr;
+        }
+    }
 }
 
 Stmt parse_stmt(const Token** it) {
     Stmt stmt;
     switch ((*it)->type) {
-        case SEMICOLON:
+        case SEMICOLON: // ;
             stmt.type = NOP;
             stmt.token = *(*it)++;
             return stmt;
 
-        default:
-            Expr expr = parse_expr(it, INITIAL_PRECEDENCE);
+        default: // expr ;
+            Expr expr = parse_expr(it, MAX_PRECEDENCE);
             if (expr.type == ERROR_EXPR) return (Stmt) { ERROR_STMT };
+            // terminating semicolon
             if ((*it)->type != SEMICOLON) {
                 unexpected_token(**it);
                 free_expr(expr);
@@ -663,8 +748,15 @@ Stmt parse_stmt(const Token** it) {
 }
 
 Stmt parse_block(const Token** it, TokenEnum end) {
+    // stmt ...
+
+    // initialize array
     size_t length = 0, capacity = 1;
     Stmt* array = malloc(sizeof(Stmt) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return (Stmt) { ERROR_STMT };
+    }
 
     while ((*it)->type != end) {
         // expand array when out of capacity
@@ -679,6 +771,7 @@ Stmt parse_block(const Token** it, TokenEnum end) {
             array = new_array;
         }
 
+        // next statement
         Stmt item = parse_stmt(it);
         if (item.type == ERROR_STMT) {
             free_stmt_arrn(array, length);
@@ -689,12 +782,14 @@ Stmt parse_block(const Token** it, TokenEnum end) {
 
     Stmt stmt;
     stmt.type = BLOCK;
-    // stmt.token = { ERROR_TOKEN };
     stmt.data.block.len = length;
     stmt.data.block.stmts = array;
     return stmt;
 }
 
+// Parse EOF_TOKEN terminated token array.
+// Result is not tagged.
+// Returns NULL if an error occurred.
 AST* parse(const Token* program) {
     if (program == NULL) return NULL;
 
@@ -718,6 +813,7 @@ AST* parse(const Token* program) {
     return ast;
 }
 
+// Free all data inside type specifier.
 void free_spec(TypeSpec spec) {
     switch (spec.type) {
         case ERROR_SPEC: break;
@@ -737,11 +833,13 @@ void free_spec(TypeSpec spec) {
     }
 }
 
+// Free type specifier array of length n all all data inside it.
 void free_spec_arrn(TypeSpec* arr, size_t n) {
     for (size_t i = 0; i < n; i++) free_spec(arr[i]);
     free(arr);
 }
 
+// Free all data inside expression.
 void free_expr(Expr expr) {
     switch (expr.type) {
         case ERROR_EXPR: break;
@@ -783,11 +881,13 @@ void free_expr(Expr expr) {
     }
 }
 
+// Free expression array of length n all all data inside it.
 void free_expr_arrn(Expr* arr, size_t n) {
     for (size_t i = 0; i < n; i++) free_expr(arr[i]);
     free(arr);
 }
 
+// Free all data inside statement.
 void free_stmt(Stmt stmt) {
     switch (stmt.type) {
         case ERROR_STMT: break;
@@ -802,11 +902,13 @@ void free_stmt(Stmt stmt) {
     }
 }
 
+// Free statement array of length n all all data inside it.
 void free_stmt_arrn(Stmt* arr, size_t n) {
     for (size_t i = 0; i < n; i++) free_stmt(arr[i]);
     free(arr);
 }
 
+// Free non-tagged abstract syntax tree token and all data inside it.
 void free_ast_p(AST* ast) {
     if (ast == NULL) return;
     free_stmt(*ast);
