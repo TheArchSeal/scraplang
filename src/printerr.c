@@ -8,7 +8,6 @@ bool error_indicator = false;
 const char* error_filename = NULL;
 size_t error_line = 0, error_col = 0;
 
-
 // Write error and formatted output to stderr.
 // Can be suppressed.
 void syntax_error(const char* format, ...) {

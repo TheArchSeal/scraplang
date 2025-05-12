@@ -145,7 +145,7 @@ TypeSpec parse_fun_spec(const Token** it) {
 
     // number of optional parameters
     size_t optional = 0;
-    while ((*it)->type != RPAREN) {
+    if ((*it)->type != RPAREN) for (;;) {
         // expand array when out of capacity
         if (length >= capacity) {
             capacity *= 2;
@@ -178,7 +178,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             return err;
         }
 
-        // (possibly trailing) comma or closing parenthesis
+        // comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
@@ -294,6 +294,7 @@ TypeSpec parse_type_spec(const Token** it) {
             spec = parse_fun_spec(it);
             error_suppress--;
             if (spec.type == ERROR_SPEC) {
+                if (error_indicator) return spec;
                 *it = branch;
 
                 // else type specifier grouped by parentheses
@@ -329,7 +330,7 @@ Expr parse_array_literal(const Token** it) {
         return (Expr) { ERROR_EXPR };
     }
 
-    while ((*it)->type != RBRACKET) {
+    if ((*it)->type != RBRACKET) for (;;) {
         // expand array when out of capacity
         if (length >= capacity) {
             capacity *= 2;
@@ -350,7 +351,7 @@ Expr parse_array_literal(const Token** it) {
         }
         memcpy(&array[length++], &item, sizeof(Expr));
 
-        // (possibly trailing) comma or closing parenthesis
+        // comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RBRACKET) break;
         else {
@@ -393,7 +394,7 @@ Expr parse_lambda(const Token** it) {
         return err;
     }
 
-    while ((*it)->type != RPAREN) {
+    if ((*it)->type != RPAREN) for (;;) {
         // expand arrays when out of capacity
         if (length >= capacity) {
             capacity *= 2;
@@ -443,7 +444,7 @@ Expr parse_lambda(const Token** it) {
         memcpy(&spec_array[length], &spec, sizeof(TypeSpec));
         length++;
 
-        // (possibly trailing) comma or closing parenthesis
+        // comma or closing parenthesis
         if ((*it)->type == COMMA) (*it)++;
         else if ((*it)->type == RPAREN) break;
         else {
