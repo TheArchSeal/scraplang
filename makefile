@@ -5,30 +5,35 @@ BIN_DIR=bin
 BUILD_DIR=build
 OBJ_DIR=$(BUILD_DIR)/obj
 
+TEST_DIR=tests
+TEST_BIN_DIR=$(BIN_DIR)/tests
+TEST_OBJ_DIR=$(BUILD_DIR)/tests
+TEST_COMMAND=./test.sh
+
+CC=gcc
+CFLAGS=-g -Wall -Wextra -I$(INC_DIR) -MMD -MP
+
 TARGET=$(BIN_DIR)/smlc
 SOURCES=$(wildcard $(SRC_DIR)/*.c)
 OBJECTS=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 MAIN_OBJ=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(MAIN_SRC))
 DEPS=$(OBJECTS:.o=.d)
 
-TEST_DIR=tests
-TEST_BIN_DIR=$(BIN_DIR)/tests
-TEST_OBJ_DIR=$(BUILD_DIR)/tests
-
 TEST_CATEGORIES=$(patsubst $(TEST_DIR)/%/,%,$(wildcard $(TEST_DIR)/*/))
 TEST_TARGETS=$(addprefix $(TEST_BIN_DIR)/,$(TEST_CATEGORIES))
 TEST_SOURCES=$(foreach category,$(TEST_CATEGORIES),$(wildcard $(TEST_DIR)/$(category)/*.c))
 TEST_OBJECTS=$(patsubst $(TEST_DIR)/%.c,$(TEST_OBJ_DIR)/%.o,$(TEST_SOURCES))
 TEST_DEPS=$(TEST_OBJECTS:.o=.d)
-TEST_COMMAND=./test.sh
 
-CC=gcc
-CFLAGS=-g -Wall -Wextra -I$(INC_DIR) -MMD -MP
+.PHONY: all test clean
 
 all: $(TARGET)
 
 test: $(TEST_TARGETS)
 	@$(TEST_COMMAND)
+
+clean:
+	rm -rf $(BIN_DIR) $(BUILD_DIR)
 
 $(TARGET): $(OBJECTS) | $(BIN_DIR)
 	$(CC) $^ -o $@
@@ -53,9 +58,4 @@ endef
 
 $(foreach category,$(TEST_CATEGORIES),$(eval $(call TEST_RULES,$(category))))
 
-clean:
-	rm -rf $(BIN_DIR) $(BUILD_DIR)
-
 -include $(DEPS) $(TEST_DEPS)
-
-.PHONY: all test clean
