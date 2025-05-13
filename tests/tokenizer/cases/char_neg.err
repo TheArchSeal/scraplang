@@ -1,0 +1,1 @@
+tests/tokenizer/cases/char_neg.sml:1:1: syntax error: multiple characters in character literal 'abc'
