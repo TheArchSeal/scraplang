@@ -5,8 +5,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main(void) {
-    const char* filename = "./test.sml";
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        fprintf(stderr, "error: wrong number of command-line arguments\n");
+        return EXIT_FAILURE;
+    }
+
+    const char* filename = argv[1];
     error_filename = filename;
 
     char* program = readfile(filename);

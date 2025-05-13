@@ -244,7 +244,6 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
                 case 'n':  str[i++] = '\n'; break;
                 case 'r':  str[i++] = '\r'; break;
                 case 't':  str[i++] = '\t'; break;
-                case 'v':  str[i++] = '\v'; break;
                 case '0':  str[i++] = '\0'; break;
 
                 case 'x': // numeric escape sequence
@@ -384,6 +383,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                 push_token = true;
                 break;
             case '\n':
+
                 line++;
                 col = 1;
                 push_token = true;
@@ -537,7 +537,7 @@ Token* tokenize(const char* program, size_t tabsize) {
             // set new start position
             tokenpos = program;
             tokenline = line;
-            tokenline = col;
+            tokencol = col;
         }
 
     } while (chr);

@@ -18,7 +18,7 @@ for program in bin/tests/*; do
             ((passed++))
         else
             printf "$category/$case: failed\n\n"
-            printf "$res\n\n"
+            printf "%s\n\n" "$res"
         fi
         ((total++))
     done
