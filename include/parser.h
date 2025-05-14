@@ -21,6 +21,7 @@ typedef struct Stmt Stmt;
 typedef enum StmtEnum StmtEnum;
 typedef union StmtData StmtData;
 typedef struct BlockStmtData BlockStmtData;
+typedef struct DeclData DeclData;
 
 typedef Stmt AST;
 
@@ -34,7 +35,7 @@ enum TypeSpecEnum {
 };
 
 struct PtrTypeSpecData {
-    TypeSpec* item_type;
+    TypeSpec* spec;
     bool mutable;
 };
 
@@ -150,6 +151,7 @@ enum StmtEnum {
     NOP,
     BLOCK,
     EXPR_STMT,
+    DECL
 };
 
 struct BlockStmtData {
@@ -157,9 +159,17 @@ struct BlockStmtData {
     Stmt* stmts;
 };
 
+struct DeclData {
+    Token name;
+    Expr val;
+    TypeSpec spec;
+    bool mutable;
+};
+
 union StmtData {
     BlockStmtData block;
     Expr expr;
+    DeclData decl;
 };
 
 struct Stmt {

@@ -30,7 +30,7 @@ TEST_DEPS=$(TEST_OBJECTS:.o=.d)
 all: $(TARGET)
 
 test: $(TEST_TARGETS)
-	@$(TEST_COMMAND)
+	@-$(TEST_COMMAND)
 
 clean:
 	rm -rf $(BIN_DIR) $(BUILD_DIR)

@@ -15,11 +15,11 @@ void print_spec(TypeSpec spec, size_t depth) {
         case ATOMIC_SPEC: printf(" %s\n", spec.data.atom.str); break;
         case ARR_SPEC:
             printf(" %s[]\n", spec.data.ptr.mutable ? "" : "const");
-            print_spec(*spec.data.ptr.item_type, depth + 1);
+            print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case PTR_SPEC:
             printf(" %s*\n", spec.data.ptr.mutable ? "" : "const");
-            print_spec(*spec.data.ptr.item_type, depth + 1);
+            print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case FUN_SPEC:
             printf(" (...%zu?)=>...\n", spec.data.fun.optc);
@@ -92,6 +92,11 @@ void print_stmt(Stmt stmt, size_t depth) {
         case EXPR_STMT:
             printf(" ...;\n");
             print_expr(stmt.data.expr, depth + 1);
+            break;
+        case DECL:
+            printf(" %s %s=...;\n", stmt.data.decl.mutable ? "var" : "const", stmt.data.decl.name.str);
+            print_expr(stmt.data.decl.val, depth + 1);
+            print_spec(stmt.data.decl.spec, depth + 1);
             break;
     }
 }

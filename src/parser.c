@@ -229,12 +229,12 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
     spec.col = start.col;
     spec.data.ptr.mutable = mut;
 
-    spec.data.ptr.item_type = malloc(sizeof(TypeSpec));
-    if (spec.data.ptr.item_type == NULL) {
+    spec.data.ptr.spec = malloc(sizeof(TypeSpec));
+    if (spec.data.ptr.spec == NULL) {
         malloc_error();
         return (TypeSpec) { ERROR_SPEC };
     }
-    memcpy(spec.data.ptr.item_type, &base, sizeof(TypeSpec));
+    memcpy(spec.data.ptr.spec, &base, sizeof(TypeSpec));
 
     // may have another modification
     TypeSpec next = parse_type_spec_mod(it, spec);
@@ -735,6 +735,65 @@ Expr parse_expr(const Token** it, size_t precedence) {
     }
 }
 
+Stmt parse_decl(const Token** it) {
+    // var x = y;
+    // const x: a = y;
+
+    Token start = **it;
+    bool mut;
+    switch (start.type) {
+        case VAR_TOKEN: mut = true; break;
+        case CONST_TOKEN: mut = false; break;
+        default:
+            unexpected_token(start);
+            return (Stmt) { ERROR_STMT };
+    }
+    (*it)++;
+
+    Token name = **it;
+    if (name.type != VAR_NAME) {
+        unexpected_token(**it);
+        return (Stmt) { ERROR_STMT };
+    }
+    (*it)++;
+
+    TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
+    if ((*it)->type == COLON) {
+        (*it)++;
+
+        spec = parse_type_spec(it);
+        if (spec.type == ERROR_SPEC) return (Stmt) { ERROR_STMT };
+    }
+
+    if ((*it)->type != EQ_TOKEN) {
+        unexpected_token(**it);
+        free_spec(spec);
+        return (Stmt) { ERROR_STMT };
+    }
+    (*it)++;
+
+    Expr val = parse_expr(it, MAX_PRECEDENCE);
+    if (val.type == ERROR_EXPR) return (Stmt) { ERROR_STMT };
+
+    if ((*it)->type != SEMICOLON) {
+        unexpected_token(**it);
+        free_spec(spec);
+        free_expr(val);
+        return (Stmt) { ERROR_STMT };
+    }
+    (*it)++;
+
+    Stmt stmt;
+    stmt.type = DECL;
+    stmt.line = start.line;
+    stmt.col = start.col;
+    stmt.data.decl.name = name;
+    stmt.data.decl.val = val;
+    stmt.data.decl.spec = spec;
+    stmt.data.decl.mutable = mut;
+    return stmt;
+}
+
 Stmt parse_stmt(const Token** it) {
     Stmt stmt;
     switch ((*it)->type) {
@@ -744,6 +803,9 @@ Stmt parse_stmt(const Token** it) {
             stmt.col = (*it)->col;
             (*it)++;
             return stmt;
+
+        case VAR_TOKEN:
+        case CONST_TOKEN: return parse_decl(it);
 
         default: // expr ;
             Expr expr = parse_expr(it, MAX_PRECEDENCE);
@@ -841,8 +903,8 @@ void free_spec(TypeSpec spec) {
 
         case ARR_SPEC:
         case PTR_SPEC:
-            free_spec(*spec.data.ptr.item_type);
-            free(spec.data.ptr.item_type);
+            free_spec(*spec.data.ptr.spec);
+            free(spec.data.ptr.spec);
             break;
         case FUN_SPEC:
             free_spec_arrn(spec.data.fun.paramt, spec.data.fun.paramc);
@@ -916,6 +978,10 @@ void free_stmt(Stmt stmt) {
             break;
         case EXPR_STMT:
             free_expr(stmt.data.expr);
+            break;
+        case DECL:
+            free_expr(stmt.data.decl.val);
+            free_spec(stmt.data.decl.spec);
             break;
     }
 }
