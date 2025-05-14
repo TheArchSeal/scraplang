@@ -45,22 +45,21 @@ struct FunTypeSpecData {
 };
 
 union TypeSpecData {
+    Token atom;
     PtrTypeSpecData ptr;
     FunTypeSpecData fun;
 };
 
 struct TypeSpec {
     TypeSpecEnum type;
-    Token token;
+    size_t line, col;
     TypeSpecData data;
 };
 
 enum ExprEnum {
     ERROR_EXPR,
 
-    LITERAL_EXPR,
-    VAR_EXPR,
-
+    ATOMIC_EXPR,
     ARR_EXPR,
     LAMBDA_EXPR,
 
@@ -109,8 +108,6 @@ enum OpEnum {
     TERNARY,
 
     ASSIGNMENT,
-
-    COMMA_OP,
 };
 
 struct ArrExprData {
@@ -128,12 +125,14 @@ struct LambdaExprData {
 
 struct OpExprData {
     OpEnum type;
+    Token token;
     Expr* first;
     Expr* second;
     Expr* third;
 };
 
 union ExprData {
+    Token atom;
     ArrExprData arr;
     LambdaExprData lambda;
     OpExprData op;
@@ -141,7 +140,7 @@ union ExprData {
 
 struct Expr {
     ExprEnum type;
-    Token token;
+    size_t line, col;
     ExprData data;
 };
 
@@ -165,7 +164,7 @@ union StmtData {
 
 struct Stmt {
     StmtEnum type;
-    Token token;
+    size_t line, col;
     StmtData data;
 };
 

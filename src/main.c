@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     error_filename = filename;
 
     char* program = readfile(filename);
-    Token* tokens = tokenize(program, 8);
+    Token* tokens = tokenize(program, 4);
     AST* ast = parse(tokens);
     if (tokens == NULL) {
         free(program);

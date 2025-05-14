@@ -4,7 +4,7 @@
 #include <string.h>
 
 // initial precedence for parse_expr
-#define MAX_PRECEDENCE 13
+#define MAX_PRECEDENCE 12
 
 TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base);
 TypeSpec parse_type_spec(const Token** it);
@@ -62,8 +62,6 @@ OpEnum infix_op_from_token(Token token) {
 
         case EQ_TOKEN: return ASSIGNMENT;
 
-        case COMMA: return COMMA_OP;
-
         default: return ERROR_OP;
     }
 }
@@ -109,8 +107,6 @@ size_t operator_precedence(OpEnum op) {
         case TERNARY: return 11;
 
         case ASSIGNMENT: return 12;
-
-        case COMMA_OP: return 13;
     }
 
     return 0;
@@ -128,9 +124,9 @@ TypeSpec parse_fun_spec(const Token** it) {
     TypeSpec err = { ERROR_SPEC };
 
     // opening parenthesis
-    Token token = **it;
-    if (token.type != LPAREN) {
-        unexpected_token(token);
+    Token start = **it;
+    if (start.type != LPAREN) {
+        unexpected_token(start);
         return err;
     }
     (*it)++;
@@ -171,8 +167,8 @@ TypeSpec parse_fun_spec(const Token** it) {
             (*it)++;
             optional++;
         } else if (optional) {
-            error_line = token.line;
-            error_col = token.col;
+            error_line = start.line;
+            error_col = start.col;
             syntax_error("non-optional parameter after optional parameter");
             free_spec_arrn(array, length);
             return err;
@@ -206,7 +202,8 @@ TypeSpec parse_fun_spec(const Token** it) {
 
     TypeSpec spec;
     spec.type = FUN_SPEC;
-    spec.token = token;
+    spec.line = start.line;
+    spec.col = start.col;
     spec.data.fun.paramc = length;
     spec.data.fun.optc = optional;
     spec.data.fun.paramt = array;
@@ -224,11 +221,12 @@ TypeSpec parse_fun_spec(const Token** it) {
 }
 
 TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, TypeSpec base) {
-    Token token = *(*it)++;
+    Token start = *(*it)++;
 
     TypeSpec spec;
     spec.type = type;
-    spec.token = token;
+    spec.line = start.line;
+    spec.col = start.col;
     spec.data.ptr.mutable = mut;
 
     spec.data.ptr.item_type = malloc(sizeof(TypeSpec));
@@ -284,7 +282,9 @@ TypeSpec parse_type_spec(const Token** it) {
         case VAR_NAME:
             Token token = *(*it)++;
             spec.type = ATOMIC_SPEC;
-            spec.token = token;
+            spec.line = token.line;
+            spec.col = token.col;
+            spec.data.atom = token;
             return parse_type_spec_mod(it, spec);
 
         case LPAREN:
@@ -320,7 +320,7 @@ TypeSpec parse_type_spec(const Token** it) {
 Expr parse_array_literal(const Token** it) {
     // [x, y, z]
 
-    Token token = *(*it)++;
+    Token start = *(*it)++;
 
     // initialize array
     size_t length = 0, capacity = 1;
@@ -364,7 +364,8 @@ Expr parse_array_literal(const Token** it) {
 
     Expr expr;
     expr.type = ARR_EXPR;
-    expr.token = token;
+    expr.line = start.line;
+    expr.col = start.col;
     expr.data.arr.len = length;
     expr.data.arr.items = array;
     return expr;
@@ -376,9 +377,9 @@ Expr parse_lambda(const Token** it) {
     Expr err = { ERROR_EXPR };
 
     // opening parenthesis
-    Token token = **it;
-    if (token.type != LPAREN) {
-        unexpected_token(token);
+    Token start = **it;
+    if (start.type != LPAREN) {
+        unexpected_token(start);
         return err;
     }
     (*it)++;
@@ -427,7 +428,7 @@ Expr parse_lambda(const Token** it) {
         (*it)++;
 
         // optional parameter type specifier
-        TypeSpec spec = { INFERRED_SPEC, {}, {} };
+        TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
         if ((*it)->type == COLON) {
             (*it)++;
 
@@ -457,7 +458,7 @@ Expr parse_lambda(const Token** it) {
     (*it)++;
 
     // optional return type specifier
-    TypeSpec ret = { INFERRED_SPEC, {}, {} };
+    TypeSpec ret = { INFERRED_SPEC, start.line, start.col, {} };
     if ((*it)->type == COLON) {
         (*it)++;
 
@@ -490,7 +491,8 @@ Expr parse_lambda(const Token** it) {
 
     Expr expr;
     expr.type = LAMBDA_EXPR;
-    expr.token = token;
+    expr.line = start.line;
+    expr.col = start.col;
     expr.data.lambda.paramc = length;
     expr.data.lambda.paramv = name_array;
     expr.data.lambda.paramt = spec_array;
@@ -517,8 +519,10 @@ Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
 
     Expr expr;
     expr.type = UNOP_EXPR;
-    expr.token = token;
+    expr.line = term.line;
+    expr.col = term.col;
     expr.data.op.type = type;
+    expr.data.op.token = token;
 
     expr.data.op.first = malloc(sizeof(Expr));
     if (expr.data.op.first == NULL) {
@@ -547,7 +551,9 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
 
     Expr expr;
     expr.type = UNOP_EXPR;
-    expr.token = token;
+    expr.line = token.line;
+    expr.col = token.col;
+    expr.data.op.token = token;
     expr.data.op.type = type;
 
     expr.data.op.first = malloc(sizeof(Expr));
@@ -561,12 +567,14 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
     return expr;
 }
 
-Expr handle_atomic_term(ExprEnum type, const Token** it) {
+Expr handle_atomic_term(const Token** it) {
     Token token = *(*it)++;
 
     Expr expr;
-    expr.type = type;
-    expr.token = token;
+    expr.type = ATOMIC_EXPR;
+    expr.line = token.line;
+    expr.col = token.col;
+    expr.data.atom = token;
 
     return parse_postfix(it, expr);
 }
@@ -592,8 +600,8 @@ Expr parse_term(const Token** it) {
         // atom
         case INT_LITERAL:
         case CHR_LITERAL:
-        case STR_LITERAL: return handle_atomic_term(LITERAL_EXPR, it);
-        case VAR_NAME: return handle_atomic_term(VAR_EXPR, it);
+        case STR_LITERAL: return handle_atomic_term(it);
+        case VAR_NAME: return handle_atomic_term(it);
 
         case PLUS: return handle_unary_prefix(UNARY_PLUS, it);
         case DPLUS: return handle_unary_prefix(POSTFIX_INC, it);
@@ -683,7 +691,9 @@ Expr parse_expr(const Token** it, size_t precedence) {
 
         Expr expr;
         expr.type = ternary ? TERNOP_EXPR : BINOP_EXPR;
-        expr.token = token;
+        expr.line = lhs.line;
+        expr.col = lhs.col;
+        expr.data.op.token = token;
 
         expr.data.op.first = malloc(sizeof(Expr));
         expr.data.op.second = malloc(sizeof(Expr));
@@ -730,7 +740,9 @@ Stmt parse_stmt(const Token** it) {
     switch ((*it)->type) {
         case SEMICOLON: // ;
             stmt.type = NOP;
-            stmt.token = *(*it)++;
+            stmt.line = (*it)->line;
+            stmt.col = (*it)->col;
+            (*it)++;
             return stmt;
 
         default: // expr ;
@@ -742,8 +754,10 @@ Stmt parse_stmt(const Token** it) {
                 free_expr(expr);
                 return (Stmt) { ERROR_STMT };
             }
+            (*it)++;
             stmt.type = EXPR_STMT;
-            stmt.token = *(*it)++;
+            stmt.line = expr.line;
+            stmt.col = expr.col;
             stmt.data.expr = expr;
             return stmt;
     }
@@ -752,6 +766,7 @@ Stmt parse_stmt(const Token** it) {
 Stmt parse_block(const Token** it, TokenEnum end) {
     // stmt ...
 
+    Token start = **it;
     // initialize array
     size_t length = 0, capacity = 1;
     Stmt* array = malloc(sizeof(Stmt) * capacity);
@@ -784,6 +799,8 @@ Stmt parse_block(const Token** it, TokenEnum end) {
 
     Stmt stmt;
     stmt.type = BLOCK;
+    stmt.line = start.line;
+    stmt.col = start.col;
     stmt.data.block.len = length;
     stmt.data.block.stmts = array;
     return stmt;
@@ -845,8 +862,7 @@ void free_spec_arrn(TypeSpec* arr, size_t n) {
 void free_expr(Expr expr) {
     switch (expr.type) {
         case ERROR_EXPR: break;
-        case LITERAL_EXPR: break;
-        case VAR_EXPR: break;
+        case ATOMIC_EXPR: break;
 
         case ARR_EXPR:
             free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
