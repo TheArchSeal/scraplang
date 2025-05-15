@@ -14,11 +14,11 @@ void print_spec(TypeSpec spec, size_t depth) {
         case INFERRED_SPEC: printf(" (inferred)\n"); break;
         case ATOMIC_SPEC: printf(" %s\n", spec.data.atom.str); break;
         case ARR_SPEC:
-            printf(" %s[]\n", spec.data.ptr.mutable ? "" : "const");
+            printf(" %s...[]\n", spec.data.ptr.mutable ? "" : "const");
             print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case PTR_SPEC:
-            printf(" %s*\n", spec.data.ptr.mutable ? "" : "const");
+            printf(" %s...*\n", spec.data.ptr.mutable ? "" : "const");
             print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case FUN_SPEC:

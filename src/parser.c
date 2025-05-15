@@ -223,10 +223,15 @@ TypeSpec parse_fun_spec(const Token** it) {
 TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, TypeSpec base) {
     Token start = *(*it)++;
 
+    if (start.type == LBRACKET) {
+        if ((*it)->type != RBRACKET) return (TypeSpec) { ERROR_SPEC };
+        (*it)++;
+    }
+
     TypeSpec spec;
     spec.type = type;
-    spec.line = start.line;
-    spec.col = start.col;
+    spec.line = base.line;
+    spec.col = base.col;
     spec.data.ptr.mutable = mut;
 
     spec.data.ptr.spec = malloc(sizeof(TypeSpec));
@@ -308,6 +313,10 @@ TypeSpec parse_type_spec(const Token** it) {
                     return (TypeSpec) { ERROR_SPEC };
                 }
                 (*it)++;
+                // type specifier starts at opening parenthesis
+                // to ensure modifiers use correct column
+                spec.line = branch->line;
+                spec.col = branch->col;
             }
             return parse_type_spec_mod(it, spec);
 
@@ -634,6 +643,10 @@ Expr parse_term(const Token** it) {
                     return (Expr) { ERROR_EXPR };
                 }
                 (*it)++;
+                // expression starts at opening parenthesis
+                // to ensure postfix operations use correct column
+                expr.line = branch->line;
+                expr.col = branch->col;
             }
             return parse_postfix(it, expr);
 
