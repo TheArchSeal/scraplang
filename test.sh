@@ -5,13 +5,14 @@ total=0
 
 for program in bin/tests/*; do
     [ -x "$program" ] || continue
-    category=$(basename "$program")
+    category=$(basename "$program" .exe)
 
     for input in tests/"$category"/cases/*.sml; do
         [ -r "$input" ] || continue
         case=$(basename "$input");
 
         res=$("$program" "$input" 2>&1) && output="${input%.sml}.out" || output="${input%.sml}.err"
+        [ "$OSTYPE" = "msys" ] && res=$(echo "$res" | dos2unix)
         [ -r "$output" ] && res=$(echo "$res" | diff "$output" -)
         if [ $? = 0 ]; then
             printf "$category/$case: passed\n"

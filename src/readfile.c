@@ -2,6 +2,7 @@
 #include "printerr.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 // Read entire file to string.
 // Returns NULL on error.
@@ -9,16 +10,17 @@ char* readfile(const char* filename) {
     if (filename == NULL) return NULL;
 
     // open file
-    FILE* fp = fopen(filename, "r");
+    FILE* fp = fopen(filename, "rb");
     if (fp == NULL) {
         fread_error();
         return NULL;
     }
 
     // get file size
-    int failed = fseek(fp, 0, SEEK_END);
+    fseek(fp, 0, SEEK_END);
     size_t size = ftell(fp);
-    if (failed || fseek(fp, 0, SEEK_SET)) {
+    fseek(fp, 0, SEEK_SET);
+    if (errno) {
         fread_error();
         fclose(fp);
         return NULL;
