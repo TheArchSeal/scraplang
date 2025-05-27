@@ -1,1 +1,1 @@
-tests/parser/cases/neg_trailing.sml:1:3: syntax error: unexpected token ','
+tests/parser/cases/neg_trailing.sml:1:7: syntax error: unexpected token ')'

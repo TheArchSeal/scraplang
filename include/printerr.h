@@ -3,9 +3,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-extern size_t error_suppress;
-extern bool error_indicator;
-
 extern const char* error_filename;
 extern size_t error_line, error_col;
 

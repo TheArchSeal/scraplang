@@ -13,7 +13,7 @@ Expr parse_postfix(const Token** it, Expr term);
 Expr parse_term(const Token** it);
 Expr parse_expr(const Token** it, size_t precedence);
 
-Stmt parse_block(const Token** it, size_t endc, const TokenEnum* endv);
+Stmt parse_block(const Token** it);
 Stmt parse_stmt(const Token** it);
 
 void free_spec(TypeSpec spec);
@@ -115,10 +115,70 @@ size_t operator_precedence(OpEnum op) {
     return 0;
 }
 
-// Whether precedence is right-to-left associative
+// Whether precedence is right-to-left associative.
 bool operator_rtl_associative(size_t precedence) {
     return precedence == 11
         || precedence == 12;
+}
+
+// Looks ahead and checks whether the token after the
+// matching closing parenthesis is a double arrow or colon.
+// Preserves the it position.
+bool is_lambda(const Token* const* it) {
+    const Token* i = *it;
+
+    if (i->type != LPAREN) return false;
+    i++;
+    size_t level = 1;
+
+    while (level > 0) {
+        switch (i->type) {
+            case LPAREN: level++; break;
+            case RPAREN: level--; break;
+            default: break;
+        }
+        i++;
+    }
+
+    switch (i->type) {
+        case DARROW:
+        case COLON: return true;
+        default: return false;
+    }
+}
+
+// Checks the next token to see if it could be a statement.
+// Preserves the it position.
+bool is_statement(const Token* const* it) {
+    switch ((*it)->type) {
+        case SEMICOLON: // stmt
+        case VAR_TOKEN:
+        case CONST_TOKEN:
+        case TYPE_TOKEN:
+        case IF_TOKEN:
+        case SWITCH_TOKEN:
+        case WHILE_TOKEN:
+        case DO_TOKEN:
+        case FOR_TOKEN:
+        case FN_TOKEN:
+
+        case INT_LITERAL: // expr
+        case CHR_LITERAL:
+        case STR_LITERAL:
+        case VAR_NAME:
+        case PLUS:
+        case DPLUS:
+        case MINUS:
+        case DMINUS:
+        case TILDE:
+        case EXCLMARK:
+        case STAR:
+        case AND:
+        case LBRACKET:
+        case LPAREN: return true;
+
+        default: return false;
+    }
 }
 
 // Parse parameter list and return type.
@@ -452,17 +512,10 @@ TypeSpec parse_type_spec(const Token** it) {
             return parse_type_spec_mod(it, spec);
 
         case LPAREN:
-            // try function type specifier
-            const Token* branch = *it;
-            error_suppress++;
-            spec = parse_fun_spec(it);
-            error_suppress--;
-            if (spec.type == ERROR_SPEC) {
-                if (error_indicator) return spec;
-                *it = branch;
-
-                // else type specifier grouped by parentheses
-                (*it)++;
+            if (is_lambda(it)) { // check if function type specifier
+                spec = parse_fun_spec(it);
+            } else { // type specifier grouped by parentheses
+                Token start = *(*it)++;
                 spec = parse_type_spec(it);
                 if (spec.type == ERROR_SPEC) return spec;
 
@@ -474,8 +527,8 @@ TypeSpec parse_type_spec(const Token** it) {
                 (*it)++;
                 // type specifier starts at opening parenthesis
                 // to ensure modifiers use correct column
-                spec.line = branch->line;
-                spec.col = branch->col;
+                spec.line = start.line;
+                spec.col = start.col;
             }
             TypeSpec next = parse_type_spec_mod(it, spec);
             if (next.type == ERROR_SPEC) {
@@ -696,17 +749,11 @@ Expr parse_term(const Token** it) {
 
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
-            // try lambda expression
-            const Token* branch = *it;
-            error_suppress++;
-            Expr expr = parse_lambda(it);
-            error_suppress--;
-            if (expr.type == ERROR_EXPR) {
-                if (error_indicator) return expr;
-                *it = branch;
-
-                // else expression grouped by parentheses
-                (*it)++;
+            Expr expr;
+            if (is_lambda(it)) { // check if lambda expression
+                expr = parse_lambda(it);
+            } else { // expression grouped by parentheses
+                Token start = *(*it)++;
                 expr = parse_expr(it, MAX_PRECEDENCE);
                 if (expr.type == ERROR_EXPR) return expr;
 
@@ -718,8 +765,8 @@ Expr parse_term(const Token** it) {
                 (*it)++;
                 // expression starts at opening parenthesis
                 // to ensure postfix operations use correct column
-                expr.line = branch->line;
-                expr.col = branch->col;
+                expr.line = start.line;
+                expr.col = start.col;
             }
             Expr next = parse_postfix(it, expr);
             if (next.type == ERROR_EXPR) {
@@ -1123,7 +1170,7 @@ Stmt parse_switch(const Token** it) {
         }
         (*it)++;
 
-        Stmt branch_value = parse_block(it, 3, (TokenEnum[]) { RBRACE, CASE_TOKEN, DEFAULT_TOKEN });
+        Stmt branch_value = parse_block(it);
         if (branch_value.type == ERROR_STMT) {
             free_expr(expr);
             free_expr(case_value);
@@ -1297,6 +1344,7 @@ Stmt parse_for(const Token** it) {
         default:
             *it = branch;
             unexpected_token(**it);
+            free_stmt(init);
             return (Stmt) { ERROR_STMT, 0, 0, {} };
     }
 
@@ -1406,7 +1454,7 @@ Stmt parse_function(const Token** it) {
     }
     (*it)++;
 
-    Stmt body = parse_block(it, 1, (TokenEnum[]) { RBRACE });
+    Stmt body = parse_block(it);
     if (body.type == ERROR_STMT) {
         unexpected_token(**it);
         free(stmt.data.fun.paramv);
@@ -1483,7 +1531,7 @@ Stmt parse_stmt(const Token** it) {
     }
 }
 
-Stmt parse_block(const Token** it, size_t endc, const TokenEnum* endv) {
+Stmt parse_block(const Token** it) {
     // stmt ...
 
     Token start = **it;
@@ -1495,16 +1543,7 @@ Stmt parse_block(const Token** it, size_t endc, const TokenEnum* endv) {
         return (Stmt) { ERROR_STMT, 0, 0, {} };
     }
 
-    for (;;) {
-        bool end = false;
-        for (size_t i = 0; i < endc; i++) {
-            if ((*it)->type == endv[i]) {
-                end = true;
-                break;
-            }
-        }
-        if (end) break;
-
+    while (is_statement(it)) {
         // expand array when out of capacity
         if (length >= capacity) {
             capacity *= 2;
@@ -1542,7 +1581,7 @@ AST* parse(const Token* program) {
     if (program == NULL) return NULL;
 
     const Token** it = &program;
-    Stmt stmt = parse_block(it, 1, (TokenEnum[]) { EOF_TOKEN });
+    Stmt stmt = parse_block(it);
     if (stmt.type == ERROR_STMT) return NULL;
 
     if ((*it)->type != EOF_TOKEN) {
