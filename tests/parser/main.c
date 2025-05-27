@@ -14,15 +14,15 @@ void print_spec(TypeSpec spec, size_t depth) {
         case INFERRED_SPEC: printf(" (inferred)\n"); break;
         case ATOMIC_SPEC: printf(" %s\n", spec.data.atom.str); break;
         case ARR_SPEC:
-            printf(" %s...[]\n", spec.data.ptr.mutable ? "" : "const");
+            printf(" %s[]\n", spec.data.ptr.mutable ? "" : "const");
             print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case PTR_SPEC:
-            printf(" %s...*\n", spec.data.ptr.mutable ? "" : "const");
+            printf(" %s*\n", spec.data.ptr.mutable ? "" : "const");
             print_spec(*spec.data.ptr.spec, depth + 1);
             break;
         case FUN_SPEC:
-            printf(" (...%zu?)=>...\n", spec.data.fun.optc);
+            printf(" (%zu?)=>\n", spec.data.fun.optc);
             for (size_t i = 0; i < spec.data.fun.paramc; i++) {
                 print_spec(spec.data.fun.paramt[i], depth + 1);
             }
@@ -37,15 +37,16 @@ void print_expr(Expr expr, size_t depth) {
 
     switch (expr.type) {
         case ERROR_EXPR: printf(" (error)\n"); break;
+        case NO_EXPR: printf(" (empty)\n"); break;
         case ATOMIC_EXPR: printf(" %s\n", expr.data.atom.str); break;
         case ARR_EXPR:
-            printf(" [...]\n");
+            printf(" []\n");
             for (size_t i = 0; i < expr.data.arr.len; i++) {
                 print_expr(expr.data.arr.items[i], depth + 1);
             }
             break;
         case LAMBDA_EXPR:
-            printf(" (...)=>...\n");
+            printf(" ()=>\n");
             for (size_t i = 0; i < expr.data.lambda.paramc; i++) {
                 for (size_t i = 0; i < depth + 1; i++) printf("    ");
                 printf("param   :%zu:%zu %s\n",
@@ -56,7 +57,7 @@ void print_expr(Expr expr, size_t depth) {
                 print_spec(expr.data.lambda.paramt[i], depth + 1);
             }
             print_expr(*expr.data.lambda.expr, depth + 1);
-            print_spec(*expr.data.lambda.ret, depth + 1);
+            print_spec(expr.data.lambda.ret, depth + 1);
             break;
         case UNOP_EXPR:
             printf(" %s\n", expr.data.op.token.str);
@@ -82,21 +83,60 @@ void print_stmt(Stmt stmt, size_t depth) {
 
     switch (stmt.type) {
         case ERROR_STMT: printf(" (error)\n"); break;
-        case NOP: printf(" ;\n"); break;
+        case NOP: printf(" (nop)\n"); break;
         case BLOCK:
-            printf(" {...}\n");
+            printf(" {}\n");
             for (size_t i = 0; i < stmt.data.block.len; i++) {
                 print_stmt(stmt.data.block.stmts[i], depth + 1);
             }
             break;
         case EXPR_STMT:
-            printf(" ...;\n");
+            printf(" ;\n");
             print_expr(stmt.data.expr, depth + 1);
             break;
         case DECL:
-            printf(" %s %s=...;\n", stmt.data.decl.mutable ? "var" : "const", stmt.data.decl.name.str);
+            printf(" %s %s\n", stmt.data.decl.mutable ? "var" : "const", stmt.data.decl.name.str);
             print_expr(stmt.data.decl.val, depth + 1);
             print_spec(stmt.data.decl.spec, depth + 1);
+            break;
+        case TYPEDEF:
+            printf(" type %s\n", stmt.data.type.name.str);
+            print_spec(stmt.data.type.val, depth + 1);
+            break;
+        case IFELSE_STMT:
+            printf(" if %s\n", stmt.data.ifelse.on_false ? " else" : "");
+            print_stmt(*stmt.data.forloop.init, depth + 1);
+            print_expr(stmt.data.forloop.condition, depth + 1);
+            print_expr(stmt.data.forloop.expr, depth + 1);
+            print_stmt(*stmt.data.forloop.body, depth + 1);
+            break;
+        case SWITCH_STMT:
+            printf(" switch\n");
+            print_expr(stmt.data.switchcase.expr, depth + 1);
+            for (size_t i = 0; i < stmt.data.switchcase.casec; i++) {
+                if (i == stmt.data.switchcase.defaulti) {
+                    for (size_t i = 0; i < depth + 1; i++) printf("    ");
+                    printf("default\n");
+                } else print_expr(stmt.data.switchcase.casev[i], depth + 1);
+                print_stmt(stmt.data.switchcase.branchv[i], depth + 1);
+            }
+            break;
+        case WHILE_STMT:
+            printf(" while\n");
+            print_expr(stmt.data.whileloop.condition, depth + 1);
+            print_stmt(*stmt.data.whileloop.body, depth + 1);
+            break;
+        case DOWHILE_STMT:
+            printf(" do while\n");
+            print_expr(stmt.data.whileloop.condition, depth + 1);
+            print_stmt(*stmt.data.whileloop.body, depth + 1);
+            break;
+        case FOR_STMT:
+            printf(" for\n");
+            print_stmt(*stmt.data.forloop.init, depth + 1);
+            print_expr(stmt.data.forloop.condition, depth + 1);
+            print_expr(stmt.data.forloop.expr, depth + 1);
+            print_stmt(*stmt.data.forloop.body, depth + 1);
             break;
     }
 }

@@ -334,8 +334,8 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
 // Returns whether an error occurred.
 bool parse_chr(char* dst, const char* src, size_t src_len) {
     // parse like string literal
-    char* str;
-    size_t len;
+    char* str = NULL;
+    size_t len = 0;
     bool failed = parse_str(&str, &len, src, src_len);
     if (failed) return true;
 
@@ -353,6 +353,7 @@ bool parse_chr(char* dst, const char* src, size_t src_len) {
 
     // get first character
     *dst = *str;
+    free(str);
     return false;
 }
 
@@ -509,7 +510,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                 str[tokenlen] = '\0';
 
                 // add necessary data based on type
-                TokenData data;
+                TokenData data = {};
                 switch (tokentype) {
                     case INT_LITERAL:
                         if (parse_int(&data.int_literal, str)) {
@@ -536,8 +537,8 @@ Token* tokenize(const char* program, size_t tabsize) {
                         // variable name is same as token string
                         data.var_name = str;
                         break;
-                    default:
-                        break;
+
+                    default: break;
                 }
 
                 // push token

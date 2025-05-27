@@ -4,25 +4,8 @@
 #include <stdbool.h>
 
 typedef struct TypeSpec TypeSpec;
-typedef enum TypeSpecEnum TypeSpecEnum;
-typedef union TypeSpecData TypeSpecData;
-typedef struct PtrTypeSpecData PtrTypeSpecData;
-typedef struct FunTypeSpecData FunTypeSpecData;
-
 typedef struct Expr Expr;
-typedef enum ExprEnum ExprEnum;
-typedef enum OpEnum OpEnum;
-typedef union ExprData ExprData;
-typedef struct ArrExprData ArrExprData;
-typedef struct LambdaExprData LambdaExprData;
-typedef struct OpExprData OpExprData;
-
 typedef struct Stmt Stmt;
-typedef enum StmtEnum StmtEnum;
-typedef union StmtData StmtData;
-typedef struct BlockStmtData BlockStmtData;
-typedef struct DeclData DeclData;
-
 typedef Stmt AST;
 
 enum TypeSpecEnum {
@@ -45,11 +28,17 @@ struct FunTypeSpecData {
     TypeSpec* ret;
 };
 
+typedef struct PtrTypeSpecData PtrTypeSpecData;
+typedef struct FunTypeSpecData FunTypeSpecData;
+
 union TypeSpecData {
     Token atom;
     PtrTypeSpecData ptr;
     FunTypeSpecData fun;
 };
+
+typedef enum TypeSpecEnum TypeSpecEnum;
+typedef union TypeSpecData TypeSpecData;
 
 struct TypeSpec {
     TypeSpecEnum type;
@@ -59,6 +48,7 @@ struct TypeSpec {
 
 enum ExprEnum {
     ERROR_EXPR,
+    NO_EXPR,
 
     ATOMIC_EXPR,
     ARR_EXPR,
@@ -121,8 +111,13 @@ struct LambdaExprData {
     Token* paramv;
     TypeSpec* paramt;
     Expr* expr;
-    TypeSpec* ret;
+    TypeSpec ret;
 };
+
+typedef enum OpEnum OpEnum;
+typedef struct ArrExprData ArrExprData;
+typedef struct LambdaExprData LambdaExprData;
+typedef struct OpExprData OpExprData;
 
 struct OpExprData {
     OpEnum type;
@@ -139,6 +134,9 @@ union ExprData {
     OpExprData op;
 };
 
+typedef enum ExprEnum ExprEnum;
+typedef union ExprData ExprData;
+
 struct Expr {
     ExprEnum type;
     size_t line, col;
@@ -151,7 +149,14 @@ enum StmtEnum {
     NOP,
     BLOCK,
     EXPR_STMT,
-    DECL
+    DECL,
+    TYPEDEF,
+
+    IFELSE_STMT,
+    SWITCH_STMT,
+    WHILE_STMT,
+    DOWHILE_STMT,
+    FOR_STMT,
 };
 
 struct BlockStmtData {
@@ -166,11 +171,58 @@ struct DeclData {
     bool mutable;
 };
 
+struct TypedefData {
+    Token name;
+    TypeSpec val;
+};
+
+struct IfElseData {
+    Expr condition;
+    Stmt* on_true;
+    Stmt* on_false;
+};
+
+struct SwitchData {
+    Expr expr;
+    size_t casec;
+    Expr* casev;
+    Stmt* branchv;
+    size_t defaulti;
+};
+
+struct WhileData {
+    Expr condition;
+    Stmt* body;
+};
+
+struct ForData {
+    Stmt* init;
+    Expr condition;
+    Expr expr;
+    Stmt* body;
+};
+
+typedef struct BlockStmtData BlockStmtData;
+typedef struct DeclData DeclData;
+typedef struct TypedefData TypedefData;
+typedef struct IfElseData IfElseData;
+typedef struct SwitchData SwitchData;
+typedef struct WhileData WhileData;
+typedef struct ForData ForData;
+
 union StmtData {
     BlockStmtData block;
     Expr expr;
     DeclData decl;
+    TypedefData type;
+    IfElseData ifelse;
+    SwitchData switchcase;
+    WhileData whileloop;
+    ForData forloop;
 };
+
+typedef enum StmtEnum StmtEnum;
+typedef union StmtData StmtData;
 
 struct Stmt {
     StmtEnum type;

@@ -7,8 +7,6 @@ typedef uint64_t literal_t;
 #define PRIliteral PRIu64
 
 typedef struct Token Token;
-typedef enum TokenEnum TokenEnum;
-typedef union TokenData TokenData;
 
 enum TokenEnum {
     ERROR_TOKEN,
@@ -110,6 +108,9 @@ union TokenData {
     char* str_literal;
     char* var_name;
 };
+
+typedef enum TokenEnum TokenEnum;
+typedef union TokenData TokenData;
 
 struct Token {
     TokenEnum type;

@@ -11,7 +11,7 @@ TEST_OBJ_DIR=$(BUILD_DIR)/tests
 TEST_COMMAND=./test.sh
 
 CC=gcc
-CFLAGS=-g -Wall -Wextra -I$(INC_DIR) -D__USE_MINGW_ANSI_STDIO=1 -MMD -MP
+CFLAGS=-g -Wall -Wextra -Wpedantic -Werror -std=c2x -I$(INC_DIR) -D__USE_MINGW_ANSI_STDIO=1 -MMD -MP
 
 ifeq ($(OS),Windows_NT)
 MKDIR=mkdir

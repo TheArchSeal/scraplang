@@ -1,9 +1,9 @@
-stmt (1):1:1 ;
-stmt (3):2:1 ...;
-    expr (1):2:1 abc
-stmt (3):3:1 ...;
-    expr (1):3:1 123
-stmt (3):4:1 ...;
-    expr (1):4:1 "abc"
-stmt (3):5:1 ...;
-    expr (1):5:1 'a'
+stmt (1):1:1 (nop)
+stmt (3):2:1 ;
+    expr (2):2:1 abc
+stmt (3):3:1 ;
+    expr (2):3:1 123
+stmt (3):4:1 ;
+    expr (2):4:1 "abc"
+stmt (3):5:1 ;
+    expr (2):5:1 'a'
