@@ -5,8 +5,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-void print_spec(TypeSpec spec, size_t depth) {
+void print_indent(size_t depth) {
     for (size_t i = 0; i < depth; i++) printf("    ");
+}
+
+void print_spec(TypeSpec spec, size_t depth) {
+    print_indent(depth);
     printf("type (%d):%zu:%zu", spec.type, spec.line, spec.col);
 
     switch (spec.type) {
@@ -32,7 +36,7 @@ void print_spec(TypeSpec spec, size_t depth) {
 }
 
 void print_expr(Expr expr, size_t depth) {
-    for (size_t i = 0; i < depth; i++) printf("    ");
+    print_indent(depth);
     printf("expr (%d):%zu:%zu", expr.type, expr.line, expr.col);
 
     switch (expr.type) {
@@ -48,13 +52,14 @@ void print_expr(Expr expr, size_t depth) {
         case LAMBDA_EXPR:
             printf(" ()=>\n");
             for (size_t i = 0; i < expr.data.lambda.paramc; i++) {
-                for (size_t i = 0; i < depth + 1; i++) printf("    ");
+                print_indent(depth + 1);
                 printf("param   :%zu:%zu %s\n",
                     expr.data.lambda.paramv[i].line,
                     expr.data.lambda.paramv[i].col,
                     expr.data.lambda.paramv[i].str
                 );
                 print_spec(expr.data.lambda.paramt[i], depth + 1);
+                print_expr(expr.data.lambda.paramd[i], depth + 1);
             }
             print_expr(*expr.data.lambda.expr, depth + 1);
             print_spec(expr.data.lambda.ret, depth + 1);
@@ -78,7 +83,7 @@ void print_expr(Expr expr, size_t depth) {
 }
 
 void print_stmt(Stmt stmt, size_t depth) {
-    for (size_t i = 0; i < depth; i++) printf("    ");
+    print_indent(depth);
     printf("stmt (%d):%zu:%zu", stmt.type, stmt.line, stmt.col);
 
     switch (stmt.type) {
@@ -116,7 +121,7 @@ void print_stmt(Stmt stmt, size_t depth) {
             print_expr(stmt.data.switchcase.expr, depth + 1);
             for (size_t i = 0; i < stmt.data.switchcase.casec; i++) {
                 if (i == stmt.data.switchcase.defaulti) {
-                    for (size_t i = 0; i < depth + 1; i++) printf("    ");
+                    print_indent(depth + 1);
                     printf("default\n");
                 } else print_expr(stmt.data.switchcase.casev[i], depth + 1);
                 print_stmt(stmt.data.switchcase.branchv[i], depth + 1);
@@ -138,6 +143,21 @@ void print_stmt(Stmt stmt, size_t depth) {
             print_expr(stmt.data.forloop.condition, depth + 1);
             print_expr(stmt.data.forloop.expr, depth + 1);
             print_stmt(*stmt.data.forloop.body, depth + 1);
+            break;
+        case FUNCTION_STMT:
+            printf(" fn %s\n", stmt.data.fun.name.str);
+            for (size_t i = 0; i < stmt.data.fun.paramc; i++) {
+                print_indent(depth + 1);
+                printf("param   :%zu:%zu %s\n",
+                    stmt.data.fun.paramv[i].line,
+                    stmt.data.fun.paramv[i].col,
+                    stmt.data.fun.paramv[i].str
+                );
+                print_spec(stmt.data.fun.paramt[i], depth + 1);
+                print_expr(stmt.data.fun.paramd[i], depth + 1);
+            }
+            print_stmt(*stmt.data.fun.body, depth + 1);
+            print_spec(stmt.data.fun.ret, depth + 1);
             break;
     }
 }

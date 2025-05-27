@@ -121,6 +121,162 @@ bool operator_rtl_associative(size_t precedence) {
         || precedence == 12;
 }
 
+// Parse parameter list and return type.
+// Parameter start is the first token in the statement and is only used for error messages.
+// Results are stored in dst parameters unless they are NULL.
+// Returns whether an error occurred.
+bool parse_params(const Token** it, Token start,
+    size_t* len_dst, size_t* opt_dst,
+    Token** names_dst, TypeSpec** types_dst, Expr** defs_dst,
+    TypeSpec* ret_dst
+) {
+    // (x: a, y = 1): b
+
+    // opening parenthesis
+    if ((*it)->type != LPAREN) {
+        unexpected_token(start);
+        return true;
+    }
+    (*it)++;
+
+    // initialize arrays
+    size_t length = 0, capacity = 1;
+    Token* name_array = malloc(sizeof(Token) * capacity);
+    TypeSpec* type_array = malloc(sizeof(TypeSpec) * capacity);
+    Expr* def_array = malloc(sizeof(Expr) * capacity);
+    if (name_array == NULL || type_array == NULL || def_array == NULL) {
+        malloc_error();
+        free(name_array);
+        free(type_array);
+        free(def_array);
+        return true;
+    }
+
+    size_t optional = 0;
+    if ((*it)->type != RPAREN) for (;;) {
+        // expand arrays when out of capacity
+        if (length >= capacity) {
+            capacity *= 2;
+            Token* new_name_array = realloc(name_array, sizeof(Token) * capacity);
+            if (new_name_array == NULL) {
+                malloc_error();
+                free(name_array);
+                free_spec_arrn(type_array, length);
+                free_expr_arrn(def_array, length);
+                return true;
+            }
+            name_array = new_name_array;
+            TypeSpec* new_spec_array = realloc(type_array, sizeof(TypeSpec) * capacity);
+            if (new_spec_array == NULL) {
+                malloc_error();
+                free(name_array);
+                free_spec_arrn(type_array, length);
+                free_expr_arrn(def_array, length);
+                return true;
+            }
+            type_array = new_spec_array;
+            Expr* new_def_array = realloc(def_array, sizeof(Expr) * capacity);
+            if (new_def_array == NULL) {
+                malloc_error();
+                free(name_array);
+                free_spec_arrn(type_array, length);
+                free_expr_arrn(def_array, length);
+                return true;
+            }
+            def_array = new_def_array;
+        }
+
+        // next parameter name
+        Token name = **it;
+        if (name.type != VAR_NAME) {
+            unexpected_token(**it);
+            free(name_array);
+            free_spec_arrn(type_array, length);
+            free_expr_arrn(def_array, length);
+            return true;
+        }
+        (*it)++;
+
+        // optional parameter type specifier
+        TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
+        if ((*it)->type == COLON) {
+            (*it)++;
+
+            spec = parse_type_spec(it);
+            if (spec.type == ERROR_SPEC) {
+                free(name_array);
+                free_spec_arrn(type_array, length);
+                free_expr_arrn(def_array, length);
+                return true;
+            }
+        }
+
+        // optional default parameter
+        Expr def = { NO_EXPR, name.line, name.col, {} };
+        if ((*it)->type == EQ_TOKEN) {
+            (*it)++;
+
+            def = parse_expr(it, MAX_PRECEDENCE);
+            if (def.type == ERROR_EXPR) {
+                free(name_array);
+                free_spec_arrn(type_array, length);
+                free_expr_arrn(def_array, length);
+                return true;
+            }
+
+            optional++;
+        } else if (optional) {
+            error_line = start.line;
+            error_col = start.col;
+            syntax_error("non-optional parameter after optional parameter\n");
+            free(name_array);
+            free_spec_arrn(type_array, length);
+            free_expr_arrn(def_array, length);
+            return true;
+        }
+
+        // push to arrays
+        memcpy(&name_array[length], &name, sizeof(Token));
+        memcpy(&type_array[length], &spec, sizeof(TypeSpec));
+        memcpy(&def_array[length], &def, sizeof(TypeSpec));
+        length++;
+
+        // comma or closing parenthesis
+        if ((*it)->type == COMMA) (*it)++;
+        else if ((*it)->type == RPAREN) break;
+        else {
+            unexpected_token(**it);
+            free(name_array);
+            free_spec_arrn(type_array, length);
+            free_expr_arrn(def_array, length);
+            return true;
+        }
+    }
+    (*it)++;
+
+    // optional return type specifier
+    TypeSpec ret = { INFERRED_SPEC, start.line, start.col, {} };
+    if ((*it)->type == COLON) {
+        (*it)++;
+
+        ret = parse_type_spec(it);
+        if (ret.type == ERROR_SPEC) {
+            free(name_array);
+            free_spec_arrn(type_array, length);
+            free_expr_arrn(def_array, length);
+            return true;
+        }
+    }
+
+    if (len_dst) *len_dst = length;
+    if (opt_dst) *opt_dst = optional;
+    if (names_dst) *names_dst = name_array;
+    if (types_dst) *types_dst = type_array;
+    if (defs_dst) *defs_dst = def_array;
+    if (ret_dst) *ret_dst = ret;
+    return false;
+}
+
 TypeSpec parse_fun_spec(const Token** it) {
     // (a, b?) => c
 
@@ -321,12 +477,12 @@ TypeSpec parse_type_spec(const Token** it) {
                 spec.line = branch->line;
                 spec.col = branch->col;
             }
-            TypeSpec spec_mod = parse_type_spec_mod(it, spec);
-            if (spec_mod.type == ERROR_SPEC) {
+            TypeSpec next = parse_type_spec_mod(it, spec);
+            if (next.type == ERROR_SPEC) {
                 free_spec(spec);
-                return spec_mod;
+                return next;
             }
-            return spec_mod;
+            return next;
 
         default:
             unexpected_token(**it);
@@ -391,106 +547,26 @@ Expr parse_array_literal(const Token** it) {
 Expr parse_lambda(const Token** it) {
     // (x, y: a): b => z
 
-    // opening parenthesis
     Token start = **it;
-    if (start.type != LPAREN) {
-        unexpected_token(start);
-        return (Expr) { ERROR_EXPR, 0, 0, {} };
-    }
-    (*it)++;
 
-    // initialize arrays
-    size_t length = 0, capacity = 1;
-    Token* name_array = malloc(sizeof(Token) * capacity);
-    TypeSpec* spec_array = malloc(sizeof(TypeSpec) * capacity);
-    if (name_array == NULL || spec_array == NULL) {
-        malloc_error();
-        free(name_array);
-        free(spec_array);
-        return (Expr) { ERROR_EXPR, 0, 0, {} };
-    }
+    Expr expr;
+    expr.type = LAMBDA_EXPR;
+    expr.line = start.line;
+    expr.col = start.col;
 
-    if ((*it)->type != RPAREN) for (;;) {
-        // expand arrays when out of capacity
-        if (length >= capacity) {
-            capacity *= 2;
-            Token* new_name_array = realloc(name_array, sizeof(Token) * capacity);
-            if (new_name_array == NULL) {
-                malloc_error();
-                free(name_array);
-                free_spec_arrn(spec_array, length);
-                return (Expr) { ERROR_EXPR, 0, 0, {} };
-            }
-            name_array = new_name_array;
-            TypeSpec* new_spec_array = realloc(spec_array, sizeof(TypeSpec) * capacity);
-            if (new_spec_array == NULL) {
-                malloc_error();
-                free(name_array);
-                free_spec_arrn(spec_array, length);
-                return (Expr) { ERROR_EXPR, 0, 0, {} };
-            }
-            spec_array = new_spec_array;
-        }
-
-        // next parameter name
-        Token name = **it;
-        if (name.type != VAR_NAME) {
-            unexpected_token(**it);
-            free(name_array);
-            free_spec_arrn(spec_array, length);
-            return (Expr) { ERROR_EXPR, 0, 0, {} };
-        }
-        (*it)++;
-
-        // optional parameter type specifier
-        TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
-        if ((*it)->type == COLON) {
-            (*it)++;
-
-            spec = parse_type_spec(it);
-            if (spec.type == ERROR_SPEC) {
-                free(name_array);
-                free_spec_arrn(spec_array, length);
-                return (Expr) { ERROR_EXPR, 0, 0, {} };
-            }
-        }
-
-        // push to arrays
-        memcpy(&name_array[length], &name, sizeof(Token));
-        memcpy(&spec_array[length], &spec, sizeof(TypeSpec));
-        length++;
-
-        // comma or closing parenthesis
-        if ((*it)->type == COMMA) (*it)++;
-        else if ((*it)->type == RPAREN) break;
-        else {
-            unexpected_token(**it);
-            free(name_array);
-            free_spec_arrn(spec_array, length);
-            return (Expr) { ERROR_EXPR, 0, 0, {} };
-        }
-    }
-    (*it)++;
-
-    // optional return type specifier
-    TypeSpec ret = { INFERRED_SPEC, start.line, start.col, {} };
-    if ((*it)->type == COLON) {
-        (*it)++;
-
-        ret = parse_type_spec(it);
-        if (ret.type == ERROR_SPEC) {
-            free(name_array);
-            free_spec_arrn(spec_array, length);
-            return (Expr) { ERROR_EXPR, 0, 0, {} };
-        }
-    }
+    if (parse_params(it, start,
+        &expr.data.lambda.paramc, &expr.data.lambda.optc,
+        &expr.data.lambda.paramv, &expr.data.lambda.paramt, &expr.data.lambda.paramd,
+        &expr.data.lambda.ret
+    )) return (Expr) { ERROR_EXPR, 0, 0, {} };
 
     // => token
     if ((*it)->type != DARROW) {
         unexpected_token(**it);
-        free(name_array);
-        free_spec_arrn(spec_array, length);
-        free_spec(ret);
+        free(expr.data.lambda.paramv);
+        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+        free_spec(expr.data.lambda.ret);
         return (Expr) { ERROR_EXPR, 0, 0, {} };
     }
     (*it)++;
@@ -498,27 +574,20 @@ Expr parse_lambda(const Token** it) {
     // lambda body
     Expr body = parse_expr(it, MAX_PRECEDENCE);
     if (body.type == ERROR_EXPR) {
-        free(name_array);
-        free_spec_arrn(spec_array, length);
-        free_spec(ret);
+        free(expr.data.lambda.paramv);
+        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+        free_spec(expr.data.lambda.ret);
         return body;
     }
-
-    Expr expr;
-    expr.type = LAMBDA_EXPR;
-    expr.line = start.line;
-    expr.col = start.col;
-    expr.data.lambda.paramc = length;
-    expr.data.lambda.paramv = name_array;
-    expr.data.lambda.paramt = spec_array;
-    expr.data.lambda.ret = ret;
 
     expr.data.lambda.expr = malloc(sizeof(Expr));
     if (expr.data.lambda.expr == NULL) {
         malloc_error();
-        free(name_array);
-        free_spec_arrn(spec_array, length);
-        free_spec(ret);
+        free(expr.data.lambda.paramv);
+        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+        free_spec(expr.data.lambda.ret);
         free_expr(body);
         return (Expr) { ERROR_EXPR, 0, 0, {} };
     }
@@ -652,12 +721,12 @@ Expr parse_term(const Token** it) {
                 expr.line = branch->line;
                 expr.col = branch->col;
             }
-            Expr expr_postfix = parse_postfix(it, expr);
-            if (expr_postfix.type == ERROR_EXPR) {
+            Expr next = parse_postfix(it, expr);
+            if (next.type == ERROR_EXPR) {
                 free_expr(expr);
-                return expr_postfix;
+                return next;
             }
-            return expr_postfix;
+            return next;
 
         default:
             unexpected_token(**it);
@@ -1298,6 +1367,81 @@ Stmt parse_for(const Token** it) {
     return stmt;
 }
 
+Stmt parse_function(const Token** it) {
+    // fn f(x: a, y: b = 1): 1 {...}
+
+    Token start = **it;
+    if (start.type != FN_TOKEN) {
+        unexpected_token(start);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Token name = **it;
+    if (name.type != VAR_NAME) {
+        unexpected_token(name);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Stmt stmt;
+    stmt.type = FUNCTION_STMT;
+    stmt.line = start.line;
+    stmt.col = start.col;
+    stmt.data.fun.name = name;
+
+    if (parse_params(it, start,
+        &stmt.data.fun.paramc, &stmt.data.fun.optc,
+        &stmt.data.fun.paramv, &stmt.data.fun.paramt, &stmt.data.fun.paramd,
+        &stmt.data.fun.ret
+    )) return (Stmt) { ERROR_STMT, 0, 0, {} };
+
+    if ((*it)->type != LBRACE) {
+        unexpected_token(**it);
+        free(stmt.data.fun.paramv);
+        free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+        free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+        free_spec(stmt.data.fun.ret);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Stmt body = parse_block(it, 1, (TokenEnum[]) { RBRACE });
+    if (body.type == ERROR_STMT) {
+        unexpected_token(**it);
+        free(stmt.data.fun.paramv);
+        free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+        free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+        free_spec(stmt.data.fun.ret);
+        return body;
+    }
+
+    if ((*it)->type != RBRACE) {
+        unexpected_token(**it);
+        free(stmt.data.fun.paramv);
+        free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+        free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+        free_spec(stmt.data.fun.ret);
+        free_stmt(body);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    stmt.data.fun.body = malloc(sizeof(Stmt));
+    if (stmt.data.fun.body == NULL) {
+        malloc_error();
+        free(stmt.data.fun.paramv);
+        free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+        free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+        free_spec(stmt.data.fun.ret);
+        free_stmt(body);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    memcpy(stmt.data.fun.body, &body, sizeof(Stmt));
+
+    return stmt;
+}
+
 Stmt parse_stmt(const Token** it) {
     switch ((*it)->type) {
         Stmt stmt;
@@ -1318,6 +1462,8 @@ Stmt parse_stmt(const Token** it) {
         case WHILE_TOKEN: return parse_while(it);
         case DO_TOKEN: return parse_dowhile(it);
         case FOR_TOKEN: return parse_for(it);
+
+        case FN_TOKEN: return parse_function(it);
 
         default: // expr ;
             Expr expr = parse_expr(it, MAX_PRECEDENCE);
@@ -1454,6 +1600,7 @@ void free_expr(Expr expr) {
         case LAMBDA_EXPR:
             free(expr.data.lambda.paramv);
             free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+            free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
             free_expr(*expr.data.lambda.expr);
             free(expr.data.lambda.expr);
             free_spec(expr.data.lambda.ret);
@@ -1533,6 +1680,15 @@ void free_stmt(Stmt stmt) {
             free_expr(stmt.data.forloop.expr);
             free_stmt(*stmt.data.forloop.body);
             free(stmt.data.forloop.body);
+            break;
+
+        case FUNCTION_STMT:
+            free(stmt.data.fun.paramv);
+            free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+            free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+            free_stmt(*stmt.data.fun.body);
+            free(stmt.data.fun.body);
+            free_spec(stmt.data.fun.ret);
             break;
     }
 }

@@ -107,9 +107,10 @@ struct ArrExprData {
 };
 
 struct LambdaExprData {
-    size_t paramc;
+    size_t paramc, optc;
     Token* paramv;
     TypeSpec* paramt;
+    Expr* paramd;
     Expr* expr;
     TypeSpec ret;
 };
@@ -157,6 +158,8 @@ enum StmtEnum {
     WHILE_STMT,
     DOWHILE_STMT,
     FOR_STMT,
+
+    FUNCTION_STMT,
 };
 
 struct BlockStmtData {
@@ -202,6 +205,16 @@ struct ForData {
     Stmt* body;
 };
 
+struct FunData {
+    Token name;
+    size_t paramc, optc;
+    Token* paramv;
+    TypeSpec* paramt;
+    Expr* paramd;
+    Stmt* body;
+    TypeSpec ret;
+};
+
 typedef struct BlockStmtData BlockStmtData;
 typedef struct DeclData DeclData;
 typedef struct TypedefData TypedefData;
@@ -209,6 +222,7 @@ typedef struct IfElseData IfElseData;
 typedef struct SwitchData SwitchData;
 typedef struct WhileData WhileData;
 typedef struct ForData ForData;
+typedef struct FunData FunData;
 
 union StmtData {
     BlockStmtData block;
@@ -219,6 +233,7 @@ union StmtData {
     SwitchData switchcase;
     WhileData whileloop;
     ForData forloop;
+    FunData fun;
 };
 
 typedef enum StmtEnum StmtEnum;
