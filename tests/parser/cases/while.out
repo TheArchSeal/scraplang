@@ -1,0 +1,22 @@
+stmt (8):1:1 while
+    expr (2):1:8 x
+    stmt (1):1:10 (nop)
+stmt (6):2:1 if else
+    expr (2):2:5 x
+    stmt (8):2:8 while
+        expr (2):2:15 x
+        stmt (6):2:18 if else
+            expr (2):2:22 x
+            stmt (1):2:24 (nop)
+            stmt (1):2:30 (nop)
+    stmt (1):2:36 (nop)
+stmt (9):3:1 do while
+    expr (2):3:14 x
+    stmt (3):3:4 ;
+        expr (2):3:4 x
+stmt (9):4:1 do while
+    expr (2):4:24 x
+    stmt (8):4:4 while
+        expr (2):4:11 x
+        stmt (3):4:14 ;
+            expr (2):4:14 x

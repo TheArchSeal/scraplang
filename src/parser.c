@@ -566,8 +566,8 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
     expr.type = UNOP_EXPR;
     expr.line = token.line;
     expr.col = token.col;
-    expr.data.op.token = token;
     expr.data.op.type = type;
+    expr.data.op.token = token;
 
     expr.data.op.first = malloc(sizeof(Expr));
     if (expr.data.op.first == NULL) {
@@ -715,6 +715,7 @@ Expr parse_expr(const Token** it, size_t precedence) {
         expr.type = ternary ? TERNOP_EXPR : BINOP_EXPR;
         expr.line = lhs.line;
         expr.col = lhs.col;
+        expr.data.op.type = op;
         expr.data.op.token = token;
 
         expr.data.op.first = malloc(sizeof(Expr));
@@ -900,6 +901,8 @@ Stmt parse_ifelse(const Token** it) {
     stmt.data.ifelse.on_false = NULL;
 
     if ((*it)->type == ELSE_TOKEN) {
+        (*it)++;
+
         Stmt on_false = parse_stmt(it);
         if (on_false.type == ERROR_STMT) {
             free_expr(condition);
@@ -1141,13 +1144,6 @@ Stmt parse_dowhile(const Token** it) {
     Stmt body = parse_stmt(it);
     if (body.type == ERROR_STMT) return body;
 
-    if ((*it)->type != LPAREN) {
-        unexpected_token(**it);
-        free_stmt(body);
-        return (Stmt) { ERROR_STMT, 0, 0, {} };
-    }
-    (*it)++;
-
     if ((*it)->type != WHILE_TOKEN) {
         unexpected_token(**it);
         free_stmt(body);
@@ -1155,6 +1151,12 @@ Stmt parse_dowhile(const Token** it) {
     }
     (*it)++;
 
+    if ((*it)->type != LPAREN) {
+        unexpected_token(**it);
+        free_stmt(body);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
 
     Expr condition = parse_expr(it, MAX_PRECEDENCE);
     if (condition.type == ERROR_EXPR) {

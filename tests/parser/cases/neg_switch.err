@@ -1,0 +1,1 @@
+tests/parser/cases/neg_switch.sml:4:5: syntax error: multiple default labels in switch

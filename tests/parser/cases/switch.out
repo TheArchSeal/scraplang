@@ -1,0 +1,12 @@
+stmt (7):1:1 switch
+    expr (2):1:9 x
+    expr (2):2:10 0
+    stmt (2):3:9 {}
+        stmt (3):3:9 ;
+            expr (2):3:9 x
+    default
+    stmt (2):5:5 {}
+    expr (2):5:10 0
+    stmt (2):6:9 {}
+        stmt (3):6:9 ;
+            expr (2):6:9 x

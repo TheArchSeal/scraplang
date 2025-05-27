@@ -60,16 +60,16 @@ void print_expr(Expr expr, size_t depth) {
             print_spec(expr.data.lambda.ret, depth + 1);
             break;
         case UNOP_EXPR:
-            printf(" %s\n", expr.data.op.token.str);
+            printf(" (%d)%s\n", expr.data.op.type, expr.data.op.token.str);
             print_expr(*expr.data.op.first, depth + 1);
             break;
         case BINOP_EXPR:
-            printf(" %s\n", expr.data.op.token.str);
+            printf(" (%d)%s\n", expr.data.op.type, expr.data.op.token.str);
             print_expr(*expr.data.op.first, depth + 1);
             print_expr(*expr.data.op.second, depth + 1);
             break;
         case TERNOP_EXPR:
-            printf(" %s\n", expr.data.op.token.str);
+            printf(" (%d)%s\n", expr.data.op.type, expr.data.op.token.str);
             print_expr(*expr.data.op.first, depth + 1);
             print_expr(*expr.data.op.second, depth + 1);
             print_expr(*expr.data.op.third, depth + 1);
@@ -104,11 +104,12 @@ void print_stmt(Stmt stmt, size_t depth) {
             print_spec(stmt.data.type.val, depth + 1);
             break;
         case IFELSE_STMT:
-            printf(" if %s\n", stmt.data.ifelse.on_false ? " else" : "");
-            print_stmt(*stmt.data.forloop.init, depth + 1);
-            print_expr(stmt.data.forloop.condition, depth + 1);
-            print_expr(stmt.data.forloop.expr, depth + 1);
-            print_stmt(*stmt.data.forloop.body, depth + 1);
+            printf(" if%s\n", stmt.data.ifelse.on_false ? " else" : "");
+            print_expr(stmt.data.ifelse.condition, depth + 1);
+            print_stmt(*stmt.data.ifelse.on_true, depth + 1);
+            if (stmt.data.ifelse.on_false) {
+                print_stmt(*stmt.data.ifelse.on_false, depth + 1);
+            }
             break;
         case SWITCH_STMT:
             printf(" switch\n");
