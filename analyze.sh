@@ -1,3 +1,2 @@
-make clean
-scan-build make all
-valgrind make test
+#!/bin/bash
+make clean && scan-build make all && valgrind make test
