@@ -1,6 +1,6 @@
 stmt (11):1:1 fn f
-    stmt (2):1:9 {}
     type (1):1:1 (inferred)
+    stmt (2):1:9 {}
 stmt (11):2:1 fn f
     param   :2:6 x
     type (2):2:9 a
@@ -8,7 +8,7 @@ stmt (11):2:1 fn f
     param   :2:12 y
     type (2):2:15 b
     expr (2):2:19 0
+    type (2):2:23 c
     stmt (2):2:27 {}
         stmt (3):2:27 ;
             expr (2):2:27 0
-    type (2):2:23 c

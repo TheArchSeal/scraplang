@@ -37,9 +37,11 @@ TEST_SOURCES=$(foreach category,$(TEST_CATEGORIES),$(wildcard $(TEST_DIR)/$(cate
 TEST_OBJECTS=$(patsubst $(TEST_DIR)/%.c,$(TEST_OBJ_DIR)/%.o,$(TEST_SOURCES))
 TEST_DEPS=$(TEST_OBJECTS:.o=.d)
 
-.PHONY: all test clean
+.PHONY: build all test clean
 
-all: $(TARGET)
+build: $(TARGET)
+
+all: $(TARGET) $(TEST_TARGETS)
 
 test: $(TEST_TARGETS)
 	@-$(BASH) $(TEST_COMMAND)

@@ -112,7 +112,6 @@ struct LambdaExprData {
     TypeSpec* paramt;
     Expr* paramd;
     Expr* expr;
-    TypeSpec ret;
 };
 
 typedef enum OpEnum OpEnum;
@@ -211,8 +210,8 @@ struct FunData {
     Token* paramv;
     TypeSpec* paramt;
     Expr* paramd;
-    Stmt* body;
     TypeSpec ret;
+    Stmt* body;
 };
 
 typedef struct BlockStmtData BlockStmtData;

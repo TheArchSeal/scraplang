@@ -62,7 +62,6 @@ void print_expr(Expr expr, size_t depth) {
                 print_expr(expr.data.lambda.paramd[i], depth + 1);
             }
             print_expr(*expr.data.lambda.expr, depth + 1);
-            print_spec(expr.data.lambda.ret, depth + 1);
             break;
         case UNOP_EXPR:
             printf(" (%d)%s\n", expr.data.op.type, expr.data.op.token.str);
@@ -156,8 +155,8 @@ void print_stmt(Stmt stmt, size_t depth) {
                 print_spec(stmt.data.fun.paramt[i], depth + 1);
                 print_expr(stmt.data.fun.paramd[i], depth + 1);
             }
-            print_stmt(*stmt.data.fun.body, depth + 1);
             print_spec(stmt.data.fun.ret, depth + 1);
+            print_stmt(*stmt.data.fun.body, depth + 1);
             break;
     }
 }
