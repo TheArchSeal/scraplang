@@ -1,9 +1,9 @@
 stmt (1):1:1 (nop)
 stmt (3):2:1 ;
-    expr (2):2:1 abc
+    expr (3):2:1 abc
 stmt (3):3:1 ;
-    expr (2):3:1 123
+    expr (3):3:1 123
 stmt (3):4:1 ;
-    expr (2):4:1 "abc"
+    expr (3):4:1 "abc"
 stmt (3):5:1 ;
-    expr (2):5:1 'a'
+    expr (3):5:1 'a'

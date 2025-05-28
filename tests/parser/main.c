@@ -16,6 +16,10 @@ void print_spec(TypeSpec spec, size_t depth) {
     switch (spec.type) {
         case ERROR_SPEC: printf(" (error)\n"); break;
         case INFERRED_SPEC: printf(" (inferred)\n"); break;
+        case GROUPED_SPEC:
+            printf(" ()\n");
+            print_spec(*spec.data.group, depth + 1);
+            break;
         case ATOMIC_SPEC: printf(" %s\n", spec.data.atom.str); break;
         case ARR_SPEC:
             printf(" %s[]\n", spec.data.ptr.mutable ? "" : "const");
@@ -42,6 +46,10 @@ void print_expr(Expr expr, size_t depth) {
     switch (expr.type) {
         case ERROR_EXPR: printf(" (error)\n"); break;
         case NO_EXPR: printf(" (empty)\n"); break;
+        case GROUPED_EXPR:
+            printf(" ()\n");
+            print_expr(*expr.data.group, depth + 1);
+            break;
         case ATOMIC_EXPR: printf(" %s\n", expr.data.atom.str); break;
         case ARR_EXPR:
             printf(" []\n");

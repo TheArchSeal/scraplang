@@ -13,7 +13,6 @@ Expr parse_postfix(const Token** it, Expr term);
 Expr parse_term(const Token** it);
 Expr parse_expr(const Token** it, size_t precedence);
 
-Stmt parse_block(const Token** it);
 Stmt parse_stmt(const Token** it);
 
 void free_spec(TypeSpec spec);
@@ -133,6 +132,7 @@ bool is_lambda(const Token* const* it) {
 
     while (level > 0) {
         switch (i->type) {
+            case EOF_TOKEN: return false;
             case LPAREN: level++; break;
             case RPAREN: level--; break;
             default: break;
@@ -317,6 +317,37 @@ bool parse_params(const Token** it, Token start,
     return false;
 }
 
+TypeSpec parse_type_spec_group(const Token** it) {
+    Token start = **it;
+    if (start.type != LPAREN) return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
+    (*it)++;
+
+    TypeSpec group = parse_type_spec(it);
+    if (group.type == ERROR_SPEC) return group;
+
+    if ((*it)->type != RPAREN) {
+        unexpected_token(**it);
+        free_spec(group);
+        return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
+    }
+    (*it)++;
+
+    TypeSpec spec;
+    spec.type = GROUPED_SPEC;
+    spec.line = start.line;
+    spec.col = start.col;
+
+    spec.data.group = malloc(sizeof(TypeSpec));
+    if (spec.data.group == NULL) {
+        malloc_error();
+        free_spec(group);
+        return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
+    }
+    memcpy(spec.data.group, &group, sizeof(TypeSpec));
+
+    return spec;
+}
+
 TypeSpec parse_fun_spec(const Token** it) {
     // (a, b?) => c
 
@@ -492,24 +523,10 @@ TypeSpec parse_type_spec(const Token** it) {
             return parse_type_spec_mod(it, spec);
 
         case LPAREN:
-            if (is_lambda(it)) { // check if function type specifier
-                spec = parse_fun_spec(it);
-            } else { // type specifier grouped by parentheses
-                Token start = *(*it)++;
-                spec = parse_type_spec(it);
-                if (spec.type == ERROR_SPEC) return spec;
-
-                if ((*it)->type != RPAREN) {
-                    unexpected_token(**it);
-                    free_spec(spec);
-                    return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
-                }
-                (*it)++;
-                // type specifier starts at opening parenthesis
-                // to ensure modifiers use correct column
-                spec.line = start.line;
-                spec.col = start.col;
-            }
+            // check if function type specifier
+            spec = is_lambda(it)
+                ? parse_fun_spec(it)
+                : parse_type_spec_group(it);
             TypeSpec next = parse_type_spec_mod(it, spec);
             if (next.type == ERROR_SPEC) {
                 free_spec(spec);
@@ -521,6 +538,37 @@ TypeSpec parse_type_spec(const Token** it) {
             unexpected_token(**it);
             return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
     }
+}
+
+Expr parse_expr_group(const Token** it) {
+    Token start = **it;
+    if (start.type != LPAREN) return (Expr) { ERROR_EXPR, 0, 0, {} };
+    (*it)++;
+
+    Expr group = parse_expr(it, MAX_PRECEDENCE);
+    if (group.type == ERROR_EXPR) return group;
+
+    if ((*it)->type != RPAREN) {
+        unexpected_token(**it);
+        free_expr(group);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
+    Expr expr;
+    expr.type = GROUPED_EXPR;
+    expr.line = start.line;
+    expr.col = start.col;
+
+    expr.data.group = malloc(sizeof(Expr));
+    if (expr.data.group == NULL) {
+        malloc_error();
+        free_expr(group);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    memcpy(expr.data.group, &group, sizeof(Expr));
+
+    return expr;
 }
 
 Expr parse_array_literal(const Token** it) {
@@ -725,25 +773,10 @@ Expr parse_term(const Token** it) {
 
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
-            Expr expr;
-            if (is_lambda(it)) { // check if lambda expression
-                expr = parse_lambda(it);
-            } else { // expression grouped by parentheses
-                Token start = *(*it)++;
-                expr = parse_expr(it, MAX_PRECEDENCE);
-                if (expr.type == ERROR_EXPR) return expr;
-
-                if ((*it)->type != RPAREN) {
-                    unexpected_token(**it);
-                    free_expr(expr);
-                    return (Expr) { ERROR_EXPR, 0, 0, {} };
-                }
-                (*it)++;
-                // expression starts at opening parenthesis
-                // to ensure postfix operations use correct column
-                expr.line = start.line;
-                expr.col = start.col;
-            }
+            // check if lambda expression
+            Expr expr = is_lambda(it)
+                ? parse_lambda(it)
+                : parse_expr_group(it);
             Expr next = parse_postfix(it, expr);
             if (next.type == ERROR_EXPR) {
                 free_expr(expr);
@@ -848,6 +881,49 @@ Expr parse_expr(const Token** it, size_t precedence) {
             lhs = expr;
         }
     }
+}
+
+Stmt parse_block(const Token** it) {
+    // stmt ...
+
+    Token start = **it;
+    // initialize array
+    size_t length = 0, capacity = 1;
+    Stmt* array = malloc(sizeof(Stmt) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+
+    while (is_statement(it)) {
+        // expand array when out of capacity
+        if (length >= capacity) {
+            capacity *= 2;
+            Stmt* new_array = realloc(array, sizeof(Stmt) * capacity);
+            if (new_array == NULL) {
+                malloc_error();
+                free_stmt_arrn(array, length);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
+            array = new_array;
+        }
+
+        // next statement
+        Stmt item = parse_stmt(it);
+        if (item.type == ERROR_STMT) {
+            free_stmt_arrn(array, length);
+            return item;
+        }
+        memcpy(&array[length++], &item, sizeof(Stmt));
+    }
+
+    Stmt stmt;
+    stmt.type = BLOCK;
+    stmt.line = start.line;
+    stmt.col = start.col;
+    stmt.data.block.len = length;
+    stmt.data.block.stmts = array;
+    return stmt;
 }
 
 Stmt parse_decl(const Token** it) {
@@ -1522,49 +1598,6 @@ Stmt parse_stmt(const Token** it) {
     }
 }
 
-Stmt parse_block(const Token** it) {
-    // stmt ...
-
-    Token start = **it;
-    // initialize array
-    size_t length = 0, capacity = 1;
-    Stmt* array = malloc(sizeof(Stmt) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return (Stmt) { ERROR_STMT, 0, 0, {} };
-    }
-
-    while (is_statement(it)) {
-        // expand array when out of capacity
-        if (length >= capacity) {
-            capacity *= 2;
-            Stmt* new_array = realloc(array, sizeof(Stmt) * capacity);
-            if (new_array == NULL) {
-                malloc_error();
-                free_stmt_arrn(array, length);
-                return (Stmt) { ERROR_STMT, 0, 0, {} };
-            }
-            array = new_array;
-        }
-
-        // next statement
-        Stmt item = parse_stmt(it);
-        if (item.type == ERROR_STMT) {
-            free_stmt_arrn(array, length);
-            return item;
-        }
-        memcpy(&array[length++], &item, sizeof(Stmt));
-    }
-
-    Stmt stmt;
-    stmt.type = BLOCK;
-    stmt.line = start.line;
-    stmt.col = start.col;
-    stmt.data.block.len = length;
-    stmt.data.block.stmts = array;
-    return stmt;
-}
-
 // Parse EOF_TOKEN terminated token array.
 // Result is not tagged.
 // Returns NULL if an error occurred.
@@ -1596,8 +1629,12 @@ void free_spec(TypeSpec spec) {
     switch (spec.type) {
         case ERROR_SPEC: break;
         case INFERRED_SPEC: break;
-        case ATOMIC_SPEC: break;
 
+        case GROUPED_SPEC:
+            free_spec(*spec.data.group);
+            free(spec.data.group);
+            break;
+        case ATOMIC_SPEC: break;
         case ARR_SPEC:
         case PTR_SPEC:
             free_spec(*spec.data.ptr.spec);
@@ -1622,8 +1659,12 @@ void free_expr(Expr expr) {
     switch (expr.type) {
         case ERROR_EXPR: break;
         case NO_EXPR: break;
-        case ATOMIC_EXPR: break;
 
+        case GROUPED_EXPR:
+            free_expr(*expr.data.group);
+            free(expr.data.group);
+            break;
+        case ATOMIC_EXPR: break;
         case ARR_EXPR:
             free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
             break;

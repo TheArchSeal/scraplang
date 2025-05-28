@@ -11,6 +11,8 @@ typedef Stmt AST;
 enum TypeSpecEnum {
     ERROR_SPEC,
     INFERRED_SPEC,
+
+    GROUPED_SPEC,
     ATOMIC_SPEC,
     ARR_SPEC,
     PTR_SPEC,
@@ -32,6 +34,7 @@ typedef struct PtrTypeSpecData PtrTypeSpecData;
 typedef struct FunTypeSpecData FunTypeSpecData;
 
 union TypeSpecData {
+    TypeSpec* group;
     Token atom;
     PtrTypeSpecData ptr;
     FunTypeSpecData fun;
@@ -50,6 +53,7 @@ enum ExprEnum {
     ERROR_EXPR,
     NO_EXPR,
 
+    GROUPED_EXPR,
     ATOMIC_EXPR,
     ARR_EXPR,
     LAMBDA_EXPR,
@@ -128,6 +132,7 @@ struct OpExprData {
 };
 
 union ExprData {
+    Expr* group;
     Token atom;
     ArrExprData arr;
     LambdaExprData lambda;
@@ -145,8 +150,8 @@ struct Expr {
 
 enum StmtEnum {
     ERROR_STMT,
-
     NOP,
+
     BLOCK,
     EXPR_STMT,
     DECL,

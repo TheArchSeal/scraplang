@@ -1,28 +1,28 @@
 stmt (6):1:1 if
-    expr (2):1:5 x
+    expr (3):1:5 x
     stmt (3):1:8 ;
-        expr (2):1:8 x
+        expr (3):1:8 x
 stmt (6):2:1 if else
-    expr (2):2:5 x
+    expr (3):2:5 x
     stmt (3):2:8 ;
-        expr (2):2:8 x
+        expr (3):2:8 x
     stmt (3):2:16 ;
-        expr (2):2:16 x
+        expr (3):2:16 x
 stmt (6):3:1 if else
-    expr (2):3:5 x
+    expr (3):3:5 x
     stmt (3):3:8 ;
-        expr (2):3:8 x
+        expr (3):3:8 x
     stmt (6):3:16 if else
-        expr (2):3:20 x
+        expr (3):3:20 x
         stmt (3):3:23 ;
-            expr (2):3:23 x
+            expr (3):3:23 x
         stmt (3):3:31 ;
-            expr (2):3:31 x
+            expr (3):3:31 x
 stmt (6):4:1 if
-    expr (2):4:5 x
+    expr (3):4:5 x
     stmt (6):4:8 if else
-        expr (2):4:12 x
+        expr (3):4:12 x
         stmt (3):4:15 ;
-            expr (2):4:15 x
+            expr (3):4:15 x
         stmt (3):4:23 ;
-            expr (2):4:23 x
+            expr (3):4:23 x

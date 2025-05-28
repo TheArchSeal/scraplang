@@ -1,9 +1,9 @@
 stmt (4):1:1 var x
-    expr (2):1:9 0
+    expr (3):1:9 0
     type (1):1:5 (inferred)
 stmt (4):2:1 const x
-    expr (2):2:11 0
+    expr (3):2:11 0
     type (1):2:7 (inferred)
 stmt (4):3:1 var x
-    expr (2):3:13 0
-    type (2):3:8 u8
+    expr (3):3:13 0
+    type (3):3:8 u8
