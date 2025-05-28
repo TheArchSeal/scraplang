@@ -1,0 +1,5 @@
+stmt (13):1:1 enum e
+stmt (13):2:1 enum e
+    value   :2:10 x
+    value   :2:13 y
+    value   :2:16 z

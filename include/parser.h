@@ -164,6 +164,8 @@ enum StmtEnum {
     FOR_STMT,
 
     FUNCTION_STMT,
+    STRUCT_STMT,
+    ENUM_STMT,
 };
 
 struct BlockStmtData {
@@ -219,6 +221,20 @@ struct FunData {
     Stmt* body;
 };
 
+struct StructData {
+    Token name;
+    size_t paramc, optc;
+    Token* paramv;
+    TypeSpec* paramt;
+    Expr* paramd;
+};
+
+struct EnumData {
+    Token name;
+    size_t len;
+    Token* items;
+};
+
 typedef struct BlockStmtData BlockStmtData;
 typedef struct DeclData DeclData;
 typedef struct TypedefData TypedefData;
@@ -227,6 +243,8 @@ typedef struct SwitchData SwitchData;
 typedef struct WhileData WhileData;
 typedef struct ForData ForData;
 typedef struct FunData FunData;
+typedef struct StructData StructData;
+typedef struct EnumData EnumData;
 
 union StmtData {
     BlockStmtData block;
@@ -238,6 +256,8 @@ union StmtData {
     WhileData whileloop;
     ForData forloop;
     FunData fun;
+    StructData structdef;
+    EnumData enumdef;
 };
 
 typedef enum StmtEnum StmtEnum;

@@ -157,6 +157,8 @@ bool is_statement(const Token* const* it) {
         case DO_TOKEN:
         case FOR_TOKEN:
         case FN_TOKEN:
+        case STRUCT_TOKEN:
+        case ENUM_TOKEN:
 
         case INT_LITERAL: // expr
         case CHR_LITERAL:
@@ -177,7 +179,7 @@ bool is_statement(const Token* const* it) {
     }
 }
 
-// Parse parameter list and return type.
+// Parse parameter list without surrounding parentheses.
 // Parameter start is the first token in the statement and is only used for error messages.
 // Results are stored in dst parameters unless they are NULL.
 // Returns whether an error occurred.
@@ -185,14 +187,7 @@ bool parse_params(const Token** it, Token start,
     size_t* len_dst, size_t* opt_dst,
     Token** names_dst, TypeSpec** types_dst, Expr** defs_dst
 ) {
-    // (x: a, y = 1)
-
-    // opening parenthesis
-    if ((*it)->type != LPAREN) {
-        unexpected_token(start);
-        return true;
-    }
-    (*it)++;
+    // x: a, y = 1
 
     // initialize arrays
     size_t length = 0, capacity = 1;
@@ -208,7 +203,7 @@ bool parse_params(const Token** it, Token start,
     }
 
     size_t optional = 0;
-    if ((*it)->type != RPAREN) for (;;) {
+    if ((*it)->type == VAR_NAME) for (;;) {
         // expand arrays when out of capacity
         if (length >= capacity) {
             capacity *= 2;
@@ -296,18 +291,10 @@ bool parse_params(const Token** it, Token start,
         memcpy(&def_array[length], &def, sizeof(TypeSpec));
         length++;
 
-        // comma or closing parenthesis
+        // comma or end of list
         if ((*it)->type == COMMA) (*it)++;
-        else if ((*it)->type == RPAREN) break;
-        else {
-            unexpected_token(**it);
-            free(name_array);
-            free_spec_arrn(type_array, length);
-            free_expr_arrn(def_array, length);
-            return true;
-        }
+        else break;
     }
-    (*it)++;
 
     if (len_dst) *len_dst = length;
     if (opt_dst) *opt_dst = optional;
@@ -629,6 +616,11 @@ Expr parse_lambda(const Token** it) {
     // (x, y: a): b => z
 
     Token start = **it;
+    if (start.type != LPAREN) {
+        unexpected_token(start);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
 
     Expr expr;
     expr.type = LAMBDA_EXPR;
@@ -639,6 +631,15 @@ Expr parse_lambda(const Token** it) {
         &expr.data.lambda.paramc, &expr.data.lambda.optc,
         &expr.data.lambda.paramv, &expr.data.lambda.paramt, &expr.data.lambda.paramd
     )) return (Expr) { ERROR_EXPR, 0, 0, {} };
+
+    if ((*it)->type != RPAREN) {
+        unexpected_token(**it);
+        free(expr.data.lambda.paramv);
+        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
 
     // => token
     if ((*it)->type != DARROW) {
@@ -1484,6 +1485,12 @@ Stmt parse_function(const Token** it) {
     }
     (*it)++;
 
+    if ((*it)->type != LPAREN) {
+        unexpected_token(**it);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
     Stmt stmt;
     stmt.type = FUNCTION_STMT;
     stmt.line = start.line;
@@ -1494,6 +1501,15 @@ Stmt parse_function(const Token** it) {
         &stmt.data.fun.paramc, &stmt.data.fun.optc,
         &stmt.data.fun.paramv, &stmt.data.fun.paramt, &stmt.data.fun.paramd
     )) return (Stmt) { ERROR_STMT, 0, 0, {} };
+
+    if ((*it)->type != RPAREN) {
+        unexpected_token(**it);
+        free(stmt.data.fun.paramv);
+        free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
+        free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
 
     // optional return type specifier
     TypeSpec ret = { INFERRED_SPEC, start.line, start.col, {} };
@@ -1557,6 +1573,130 @@ Stmt parse_function(const Token** it) {
     return stmt;
 }
 
+Stmt parse_struct(const Token** it) {
+    // struct s {
+    //     x: a,
+    //     y: b = 1
+    // }
+
+    Token start = **it;
+    if (start.type != STRUCT_TOKEN) {
+        unexpected_token(start);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Token name = **it;
+    if (name.type != VAR_NAME) {
+        unexpected_token(name);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    if ((*it)->type != LBRACE) {
+        unexpected_token(**it);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Stmt stmt;
+    stmt.type = STRUCT_STMT;
+    stmt.line = start.line;
+    stmt.col = start.col;
+    stmt.data.structdef.name = name;
+
+    if (parse_params(it, start,
+        &stmt.data.structdef.paramc, &stmt.data.structdef.optc,
+        &stmt.data.structdef.paramv, &stmt.data.structdef.paramt, &stmt.data.structdef.paramd
+    )) return (Stmt) { ERROR_STMT, 0, 0, {} };
+
+    if ((*it)->type != RBRACE) {
+        unexpected_token(**it);
+        free(stmt.data.structdef.paramv);
+        free_spec_arrn(stmt.data.structdef.paramt, stmt.data.structdef.paramc);
+        free_expr_arrn(stmt.data.structdef.paramd, stmt.data.structdef.paramc);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    return stmt;
+}
+
+Stmt parse_enum(const Token** it) {
+    // enum e { x, y, z }
+
+    Token start = **it;
+    if (start.type != ENUM_TOKEN) {
+        unexpected_token(start);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    Token name = **it;
+    if (name.type != VAR_NAME) {
+        unexpected_token(name);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    if ((*it)->type != LBRACE) {
+        unexpected_token(**it);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+    (*it)++;
+
+    // initialize array
+    size_t length = 0, capacity = 1;
+    Token* array = malloc(sizeof(Token) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
+
+    if ((*it)->type != RBRACE) for (;;) {
+        // expand array when out of capacity
+        if (length >= capacity) {
+            capacity *= 2;
+            Token* new_array = realloc(array, sizeof(Token) * capacity);
+            if (new_array == NULL) {
+                malloc_error();
+                free(array);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
+            array = new_array;
+        }
+
+        // element in enum
+        Token item = **it;
+        if (item.type != VAR_NAME) {
+            unexpected_token(item);
+            free(array);
+            return (Stmt) { ERROR_STMT, 0, 0, {} };
+        }
+        (*it)++;
+        memcpy(&array[length++], &item, sizeof(Token));
+
+        // comma or closing parenthesis
+        if ((*it)->type == COMMA) (*it)++;
+        else if ((*it)->type == RBRACE) break;
+        else {
+            unexpected_token(**it);
+            free(array);
+            return (Stmt) { ERROR_STMT, 0, 0, {} };
+        }
+    }
+    (*it)++;
+
+    Stmt stmt;
+    stmt.type = ENUM_STMT;
+    stmt.line = start.line;
+    stmt.col = start.col;
+    stmt.data.enumdef.name = name;
+    stmt.data.enumdef.len = length;
+    stmt.data.enumdef.items = array;
+    return stmt;
+}
+
 Stmt parse_stmt(const Token** it) {
     switch ((*it)->type) {
         Stmt stmt;
@@ -1579,6 +1719,8 @@ Stmt parse_stmt(const Token** it) {
         case FOR_TOKEN: return parse_for(it);
 
         case FN_TOKEN: return parse_function(it);
+        case STRUCT_TOKEN: return parse_struct(it);
+        case ENUM_TOKEN: return parse_enum(it);
 
         default: // expr ;
             Expr expr = parse_expr(it, MAX_PRECEDENCE);
@@ -1759,6 +1901,14 @@ void free_stmt(Stmt stmt) {
             free_spec(stmt.data.fun.ret);
             free_stmt(*stmt.data.fun.body);
             free(stmt.data.fun.body);
+            break;
+        case STRUCT_STMT:
+            free(stmt.data.structdef.paramv);
+            free_spec_arrn(stmt.data.structdef.paramt, stmt.data.structdef.paramc);
+            free_expr_arrn(stmt.data.structdef.paramd, stmt.data.structdef.paramc);
+            break;
+        case ENUM_STMT:
+            free(stmt.data.enumdef.items);
             break;
     }
 }

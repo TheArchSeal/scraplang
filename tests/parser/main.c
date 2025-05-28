@@ -166,6 +166,30 @@ void print_stmt(Stmt stmt, size_t depth) {
             print_spec(stmt.data.fun.ret, depth + 1);
             print_stmt(*stmt.data.fun.body, depth + 1);
             break;
+        case STRUCT_STMT:
+            printf(" struct %s\n", stmt.data.structdef.name.str);
+            for (size_t i = 0; i < stmt.data.structdef.paramc; i++) {
+                print_indent(depth + 1);
+                printf("member  :%zu:%zu %s\n",
+                    stmt.data.structdef.paramv[i].line,
+                    stmt.data.structdef.paramv[i].col,
+                    stmt.data.structdef.paramv[i].str
+                );
+                print_spec(stmt.data.structdef.paramt[i], depth + 1);
+                print_expr(stmt.data.structdef.paramd[i], depth + 1);
+            }
+            break;
+        case ENUM_STMT:
+            printf(" enum %s\n", stmt.data.enumdef.name.str);
+            for (size_t i = 0; i < stmt.data.enumdef.len; i++) {
+                print_indent(depth + 1);
+                printf("value   :%zu:%zu %s\n",
+                    stmt.data.enumdef.items[i].line,
+                    stmt.data.enumdef.items[i].col,
+                    stmt.data.enumdef.items[i].str
+                );
+            }
+            break;
     }
 }
 
