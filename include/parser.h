@@ -195,6 +195,10 @@ enum StmtEnum {
     FUNCTION_STMT,
     STRUCT_STMT,
     ENUM_STMT,
+
+    RETURN_STMT,
+    BREAK_STMT,
+    CONTINUE_STMT,
 };
 
 struct BlockStmtData {

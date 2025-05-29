@@ -158,7 +158,10 @@ bool is_statement(const Token* const* it) {
         case FOR_TOKEN:
         case FN_TOKEN:
         case STRUCT_TOKEN:
-        case ENUM_TOKEN: return true;
+        case ENUM_TOKEN:
+        case RETURN_TOKEN:
+        case BREAK_TOKEN:
+        case CONTINUE_TOKEN: return true;
 
         default: return is_expr(it);
     }
@@ -1163,7 +1166,10 @@ Stmt parse_decl(const Token** it, bool mut) {
 
     // value
     Expr val = parse_expr(it, MAX_PRECEDENCE);
-    if (val.type == ERROR_EXPR) return (Stmt) { ERROR_STMT, 0, 0, {} };
+    if (val.type == ERROR_EXPR) {
+        free_spec(spec);
+        return (Stmt) { ERROR_STMT, 0, 0, {} };
+    }
 
     // ;
     if ((*it)->type != SEMICOLON) {
@@ -1917,6 +1923,7 @@ Stmt parse_enum(const Token** it) {
 Stmt parse_stmt(const Token** it) {
     switch ((*it)->type) {
         Stmt stmt;
+        Expr expr;
 
         case SEMICOLON:
             stmt.type = NOP;
@@ -1939,10 +1946,56 @@ Stmt parse_stmt(const Token** it) {
         case STRUCT_TOKEN: return parse_struct(it);
         case ENUM_TOKEN: return parse_enum(it);
 
-        default: // expr
-            Expr expr = parse_expr(it, MAX_PRECEDENCE);
+        case RETURN_TOKEN:
+            stmt.type = RETURN_STMT;
+            stmt.line = (*it)->line;
+            stmt.col = (*it)->col;
+            (*it)++;
+            if ((*it)->type == SEMICOLON) {
+                (*it)++;
+                stmt.data.expr = (Expr) { NO_EXPR, stmt.line, stmt.col, {} };
+                return stmt;
+            }
+            expr = parse_expr(it, MAX_PRECEDENCE);
             if (expr.type == ERROR_EXPR) return (Stmt) { ERROR_STMT, 0, 0, {} };
-            // terminating semicolon
+            // ;
+            if ((*it)->type != SEMICOLON) {
+                unexpected_token(**it);
+                free_expr(expr);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
+            (*it)++;
+            stmt.data.expr = expr;
+            return stmt;
+        case BREAK_TOKEN:
+            stmt.type = BREAK_STMT;
+            stmt.line = (*it)->line;
+            stmt.col = (*it)->col;
+            (*it)++;
+            // ;
+            if ((*it)->type != SEMICOLON) {
+                unexpected_token(**it);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
+            (*it)++;
+            return stmt;
+        case CONTINUE_TOKEN:
+            stmt.type = CONTINUE_STMT;
+            stmt.line = (*it)->line;
+            stmt.col = (*it)->col;
+            (*it)++;
+            // ;
+            if ((*it)->type != SEMICOLON) {
+                unexpected_token(**it);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
+            (*it)++;
+            return stmt;
+
+        default: // expr
+            expr = parse_expr(it, MAX_PRECEDENCE);
+            if (expr.type == ERROR_EXPR) return (Stmt) { ERROR_STMT, 0, 0, {} };
+            // ;
             if ((*it)->type != SEMICOLON) {
                 unexpected_token(**it);
                 free_expr(expr);
@@ -2144,6 +2197,12 @@ void free_stmt(Stmt stmt) {
         case ENUM_STMT:
             free(stmt.data.enumdef.items);
             break;
+
+        case RETURN_STMT:
+            free_expr(stmt.data.expr);
+            break;
+        case BREAK_STMT: break;
+        case CONTINUE_STMT: break;
     }
 }
 

@@ -47,7 +47,6 @@ a
 .
 ,
 :
-::
 ;
 var
 const
@@ -65,6 +64,9 @@ default
 while
 do
 for
+return
+break
+continue
 type
 void
 bool

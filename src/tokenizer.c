@@ -25,6 +25,9 @@ const TokenMapItem keywords[] = {
     { "while",      WHILE_TOKEN     },
     { "do",         DO_TOKEN        },
     { "for",        FOR_TOKEN       },
+    { "return",     RETURN_TOKEN    },
+    { "break",      BREAK_TOKEN     },
+    { "continue",   CONTINUE_TOKEN  },
     { "type",       TYPE_TOKEN      },
     { "void",       VOID_TOKEN      },
     { "bool",       BOOL_TOKEN      },
@@ -83,7 +86,6 @@ const TokenMapItem symbols[] = {
     { ".",          DOT             },
     { ",",          COMMA           },
     { ":",          COLON           },
-    { "::",         DCOLON          },
     { ";",          SEMICOLON       },
 };
 

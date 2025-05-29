@@ -68,7 +68,6 @@ enum TokenEnum {
     DOT,        // .
     COMMA,      // ,
     COLON,      // :
-    DCOLON,     // ::
     SEMICOLON,  // ;
 
     VAR_TOKEN,
@@ -88,6 +87,10 @@ enum TokenEnum {
     WHILE_TOKEN,
     DO_TOKEN,
     FOR_TOKEN,
+
+    RETURN_TOKEN,
+    BREAK_TOKEN,
+    CONTINUE_TOKEN,
 
     TYPE_TOKEN,
     VOID_TOKEN,

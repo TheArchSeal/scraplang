@@ -213,6 +213,12 @@ void print_stmt(Stmt stmt, size_t depth) {
                 );
             }
             break;
+        case RETURN_STMT:
+            printf(" return\n");
+            print_expr(stmt.data.expr, depth + 1);
+            break;
+        case BREAK_STMT: printf(" break\n"); break;
+        case CONTINUE_STMT: printf(" continue\n"); break;
     }
 }
 
