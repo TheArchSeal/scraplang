@@ -86,6 +86,29 @@ void print_expr(Expr expr, size_t depth) {
             print_expr(*expr.data.op.second, depth + 1);
             print_expr(*expr.data.op.third, depth + 1);
             break;
+        case SUBSRIPT_EXPR:
+            printf(" []\n");
+            print_expr(*expr.data.subscript.arr, depth + 1);
+            print_expr(*expr.data.subscript.idx, depth + 1);
+            break;
+        case CALL_EXPR:
+            printf(" ()\n");
+            print_expr(*expr.data.call.fun, depth + 1);
+            for (size_t i = 0; i < expr.data.call.argc; i++) {
+                print_expr(expr.data.call.argv[i], depth + 1);
+            }
+            break;
+        case CONSTRUCTOR_EXPR:
+            printf(" {}\n");
+            print_expr(*expr.data.call.fun, depth + 1);
+            for (size_t i = 0; i < expr.data.call.argc; i++) {
+                print_expr(expr.data.call.argv[i], depth + 1);
+            }
+            break;
+        case ACCESS_EXPR:
+            printf(" .%s\n", expr.data.access.memeber.str);
+            print_expr(*expr.data.access.obj, depth + 1);
+            break;
     }
 }
 

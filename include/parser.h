@@ -61,6 +61,11 @@ enum ExprEnum {
     UNOP_EXPR,
     BINOP_EXPR,
     TERNOP_EXPR,
+
+    SUBSRIPT_EXPR,
+    CALL_EXPR,
+    CONSTRUCTOR_EXPR,
+    ACCESS_EXPR,
 };
 
 enum OpEnum {
@@ -118,10 +123,23 @@ struct LambdaExprData {
     Expr* expr;
 };
 
+struct SubscriptData {
+    Expr* arr;
+    Expr* idx;
+};
+
+struct CallData {
+    Expr* fun;
+    size_t argc;
+    Expr* argv;
+};
+
+struct AccessData {
+    Expr* obj;
+    Token memeber;
+};
+
 typedef enum OpEnum OpEnum;
-typedef struct ArrExprData ArrExprData;
-typedef struct LambdaExprData LambdaExprData;
-typedef struct OpExprData OpExprData;
 
 struct OpExprData {
     OpEnum type;
@@ -131,12 +149,23 @@ struct OpExprData {
     Expr* third;
 };
 
+typedef struct ArrExprData ArrExprData;
+typedef struct LambdaExprData LambdaExprData;
+typedef struct OpExprData OpExprData;
+typedef struct SubscriptData SubscriptData;
+typedef struct CallData CallData;
+typedef struct ConstructorData ConstructorData;
+typedef struct AccessData AccessData;
+
 union ExprData {
     Expr* group;
     Token atom;
     ArrExprData arr;
     LambdaExprData lambda;
     OpExprData op;
+    SubscriptData subscript;
+    CallData call;
+    AccessData access;
 };
 
 typedef enum ExprEnum ExprEnum;

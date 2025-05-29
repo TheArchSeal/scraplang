@@ -120,6 +120,50 @@ bool operator_rtl_associative(size_t precedence) {
         || precedence == 12;
 }
 
+// Checks the next token to see if it could be an expression.
+// Preserves the it position.
+bool is_expr(const Token* const* it) {
+    switch ((*it)->type) {
+        case INT_LITERAL:
+        case CHR_LITERAL:
+        case STR_LITERAL:
+        case VAR_NAME:
+        case PLUS:
+        case DPLUS:
+        case MINUS:
+        case DMINUS:
+        case TILDE:
+        case EXCLMARK:
+        case STAR:
+        case AND:
+        case LBRACKET:
+        case LPAREN: return true;
+
+        default: return false;
+    }
+}
+
+// Checks the next token to see if it could be a statement.
+// Preserves the it position.
+bool is_statement(const Token* const* it) {
+    switch ((*it)->type) {
+        case SEMICOLON:
+        case VAR_TOKEN:
+        case CONST_TOKEN:
+        case TYPE_TOKEN:
+        case IF_TOKEN:
+        case SWITCH_TOKEN:
+        case WHILE_TOKEN:
+        case DO_TOKEN:
+        case FOR_TOKEN:
+        case FN_TOKEN:
+        case STRUCT_TOKEN:
+        case ENUM_TOKEN: return true;
+
+        default: return is_expr(it);
+    }
+}
+
 // Looks ahead and checks whether the token after the
 // matching closing parenthesis is a double arrow.
 // Preserves the it position.
@@ -143,47 +187,10 @@ bool is_lambda(const Token* const* it) {
     return i->type == DARROW;
 }
 
-// Checks the next token to see if it could be a statement.
-// Preserves the it position.
-bool is_statement(const Token* const* it) {
-    switch ((*it)->type) {
-        case SEMICOLON: // stmt
-        case VAR_TOKEN:
-        case CONST_TOKEN:
-        case TYPE_TOKEN:
-        case IF_TOKEN:
-        case SWITCH_TOKEN:
-        case WHILE_TOKEN:
-        case DO_TOKEN:
-        case FOR_TOKEN:
-        case FN_TOKEN:
-        case STRUCT_TOKEN:
-        case ENUM_TOKEN:
-
-        case INT_LITERAL: // expr
-        case CHR_LITERAL:
-        case STR_LITERAL:
-        case VAR_NAME:
-        case PLUS:
-        case DPLUS:
-        case MINUS:
-        case DMINUS:
-        case TILDE:
-        case EXCLMARK:
-        case STAR:
-        case AND:
-        case LBRACKET:
-        case LPAREN: return true;
-
-        default: return false;
-    }
-}
-
 // Parse parameter list without surrounding parentheses.
-// Parameter start is the first token in the statement and is only used for error messages.
 // Results are stored in dst parameters unless they are NULL.
 // Returns whether an error occurred.
-bool parse_params(const Token** it, Token start,
+bool parse_params(const Token** it,
     size_t* len_dst, size_t* opt_dst,
     Token** names_dst, TypeSpec** types_dst, Expr** defs_dst
 ) {
@@ -276,8 +283,8 @@ bool parse_params(const Token** it, Token start,
 
             optional++;
         } else if (optional) {
-            error_line = start.line;
-            error_col = start.col;
+            error_line = name.line;
+            error_col = name.col;
             syntax_error("non-optional parameter after optional parameter\n");
             free(name_array);
             free_spec_arrn(type_array, length);
@@ -301,6 +308,51 @@ bool parse_params(const Token** it, Token start,
     if (names_dst) *names_dst = name_array;
     if (types_dst) *types_dst = type_array;
     if (defs_dst) *defs_dst = def_array;
+    return false;
+}
+
+// Parse argument list without surrounding parentheses.
+// Results are stored in dst parameters unless they are NULL.
+// Returns whether an error occurred.
+bool parse_args(const Token** it, size_t* len_dst, Expr** vals_dst) {
+    // x, y, z
+
+    // initialize array
+    size_t length = 0, capacity = 1;
+    Expr* array = malloc(sizeof(Expr) * capacity);
+    if (array == NULL) {
+        malloc_error();
+        return true;
+    }
+
+    if (is_expr(it)) for (;;) {
+        // expand array when out of capacity
+        if (length >= capacity) {
+            capacity *= 2;
+            Expr* new_array = realloc(array, sizeof(Expr) * capacity);
+            if (new_array == NULL) {
+                malloc_error();
+                free_expr_arrn(array, length);
+                return true;
+            }
+            array = new_array;
+        }
+
+        // next argument
+        Expr item = parse_expr(it, MAX_PRECEDENCE);
+        if (item.type == ERROR_EXPR) {
+            free_expr_arrn(array, length);
+            return true;
+        }
+        memcpy(&array[length++], &item, sizeof(Expr));
+
+        // comma or end of list
+        if ((*it)->type == COMMA) (*it)++;
+        else break;
+    }
+
+    if (len_dst) *len_dst = length;
+    if (vals_dst) *vals_dst = array;
     return false;
 }
 
@@ -572,52 +624,24 @@ Expr parse_array_literal(const Token** it) {
     // [
     Token start = *(*it)++;
 
-    // initialize array
-    size_t length = 0, capacity = 1;
-    Expr* array = malloc(sizeof(Expr) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return (Expr) { ERROR_EXPR, 0, 0, {} };
-    }
-
-    if ((*it)->type != RBRACKET) for (;;) {
-        // expand array when out of capacity
-        if (length >= capacity) {
-            capacity *= 2;
-            Expr* new_array = realloc(array, sizeof(Expr) * capacity);
-            if (new_array == NULL) {
-                malloc_error();
-                free_expr_arrn(array, length);
-                return (Expr) { ERROR_EXPR, 0, 0, {} };
-            }
-            array = new_array;
-        }
-
-        // element in array
-        Expr item = parse_expr(it, MAX_PRECEDENCE);
-        if (item.type == ERROR_EXPR) {
-            free_expr_arrn(array, length);
-            return item;
-        }
-        memcpy(&array[length++], &item, sizeof(Expr));
-
-        // comma or closing parenthesis
-        if ((*it)->type == COMMA) (*it)++;
-        else if ((*it)->type == RBRACKET) break;
-        else {
-            unexpected_token(**it);
-            free_expr_arrn(array, length);
-            return (Expr) { ERROR_EXPR, 0, 0, {} };
-        }
-    }
-    (*it)++;
-
     Expr expr;
     expr.type = ARR_EXPR;
     expr.line = start.line;
     expr.col = start.col;
-    expr.data.arr.len = length;
-    expr.data.arr.items = array;
+
+    // items
+    if (parse_args(it, &expr.data.arr.len, &expr.data.arr.items)) {
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+
+    // ]
+    if ((*it)->type != RBRACKET) {
+        unexpected_token(**it);
+        free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
     return expr;
 }
 
@@ -633,7 +657,7 @@ Expr parse_lambda(const Token** it) {
     expr.col = start.col;
 
     // parameters
-    if (parse_params(it, start,
+    if (parse_params(it,
         &expr.data.lambda.paramc, &expr.data.lambda.optc,
         &expr.data.lambda.paramv, &expr.data.lambda.paramt, &expr.data.lambda.paramd
     )) return (Expr) { ERROR_EXPR, 0, 0, {} };
@@ -682,7 +706,173 @@ Expr parse_lambda(const Token** it) {
     return expr;
 }
 
-Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
+Expr parse_subscript(const Token** it, Expr term) {
+    // x[y]
+
+    // [
+    (*it)++;
+
+    // index
+    Expr idx = parse_expr(it, MAX_PRECEDENCE);
+    if (idx.type == ERROR_EXPR) return idx;
+
+    // ]
+    if ((*it)->type != RBRACKET) {
+        unexpected_token(**it);
+        free_expr(idx);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
+    Expr expr;
+    expr.type = SUBSRIPT_EXPR;
+    expr.line = term.line;
+    expr.col = term.col;
+
+    // allocations
+    expr.data.subscript.arr = malloc(sizeof(Expr));
+    expr.data.subscript.idx = malloc(sizeof(Expr));
+    if (expr.data.subscript.arr == NULL || expr.data.subscript.idx == NULL) {
+        malloc_error();
+        free_expr(idx);
+        free(expr.data.subscript.arr);
+        free(expr.data.subscript.idx);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    memcpy(expr.data.subscript.arr, &term, sizeof(Expr));
+    memcpy(expr.data.subscript.idx, &idx, sizeof(Expr));
+
+    // may have another postfix operator
+    Expr next = parse_postfix(it, expr);
+    if (next.type == ERROR_EXPR) {
+        free_expr(expr);
+        return next;
+    }
+    return next;
+}
+
+Expr parse_call(const Token** it, Expr term) {
+    // x(y, z)
+
+    // (
+    (*it)++;
+
+    Expr expr;
+    expr.type = CALL_EXPR;
+    expr.line = term.line;
+    expr.col = term.col;
+
+    // arguments
+    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) {
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+
+    // )
+    if ((*it)->type != RPAREN) {
+        unexpected_token(**it);
+        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
+    // allocations
+    expr.data.call.fun = malloc(sizeof(Expr));
+    if (expr.data.call.fun == NULL) {
+        malloc_error();
+        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    memcpy(expr.data.call.fun, &term, sizeof(Expr));
+
+    // may have another postfix operator
+    Expr next = parse_postfix(it, expr);
+    if (next.type == ERROR_EXPR) {
+        free_expr(expr);
+        return next;
+    }
+    return next;
+}
+
+Expr parse_constructor(const Token** it, Expr term) {
+    // x { y, z }
+
+    // {
+    (*it)++;
+
+    Expr expr;
+    expr.type = CONSTRUCTOR_EXPR;
+    expr.line = term.line;
+    expr.col = term.col;
+
+    // arguments
+    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) {
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+
+    // }
+    if ((*it)->type != RBRACE) {
+        unexpected_token(**it);
+        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
+    // allocations
+    expr.data.call.fun = malloc(sizeof(Expr));
+    if (expr.data.call.fun == NULL) {
+        malloc_error();
+        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    memcpy(expr.data.call.fun, &term, sizeof(Expr));
+
+    // may have another postfix operator
+    Expr next = parse_postfix(it, expr);
+    if (next.type == ERROR_EXPR) {
+        free_expr(expr);
+        return next;
+    }
+    return next;
+}
+
+Expr parse_access(const Token** it, Expr term) {
+    // x.y
+
+    // .
+    (*it)++;
+
+    // variable name
+    Token member = **it;
+    if (member.type != VAR_NAME) {
+        unexpected_token(member);
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    (*it)++;
+
+    Expr expr;
+    expr.type = ACCESS_EXPR;
+    expr.line = term.line;
+    expr.col = term.col;
+    expr.data.access.memeber = member;
+
+    // allocations
+    expr.data.access.obj = malloc(sizeof(Expr));
+    if (expr.data.access.obj == NULL) {
+        malloc_error();
+        return (Expr) { ERROR_EXPR, 0, 0, {} };
+    }
+    memcpy(expr.data.access.obj, &term, sizeof(Expr));
+
+    // may have another postfix operator
+    Expr next = parse_postfix(it, expr);
+    if (next.type == ERROR_EXPR) {
+        free_expr(expr);
+        return next;
+    }
+    return next;
+}
+
+Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
     // operator
     Token token = *(*it)++;
 
@@ -710,7 +900,7 @@ Expr handle_unary_postfix(OpEnum type, const Token** it, Expr term) {
     return next;
 }
 
-Expr handle_unary_prefix(OpEnum type, const Token** it) {
+Expr parse_unary_prefix(OpEnum type, const Token** it) {
     // operator
     Token token = *(*it)++;
 
@@ -737,7 +927,7 @@ Expr handle_unary_prefix(OpEnum type, const Token** it) {
     return expr;
 }
 
-Expr handle_atomic_term(const Token** it) {
+Expr parse_atomic_term(const Token** it) {
     // value
     Token token = *(*it)++;
 
@@ -752,15 +942,13 @@ Expr handle_atomic_term(const Token** it) {
 
 Expr parse_postfix(const Token** it, Expr term) {
     switch ((*it)->type) {
-        case DPLUS: return handle_unary_postfix(POSTFIX_INC, it, term);
-        case DMINUS: return handle_unary_postfix(POSTFIX_DEC, it, term);
+        case DPLUS: return parse_unary_postfix(POSTFIX_INC, it, term);
+        case DMINUS: return parse_unary_postfix(POSTFIX_DEC, it, term);
 
-            // TODO
-        case LPAREN:
-        case LBRACKET:
-        case LBRACE:
-
-        case DOT:
+        case LBRACKET: return parse_subscript(it, term);
+        case LPAREN: return parse_call(it, term);
+        case LBRACE: return parse_constructor(it, term);
+        case DOT: return parse_access(it, term);
 
         default: return term;
     }
@@ -771,17 +959,17 @@ Expr parse_term(const Token** it) {
         // atom
         case INT_LITERAL:
         case CHR_LITERAL:
-        case STR_LITERAL: return handle_atomic_term(it);
-        case VAR_NAME: return handle_atomic_term(it);
+        case STR_LITERAL: return parse_atomic_term(it);
+        case VAR_NAME: return parse_atomic_term(it);
 
-        case PLUS: return handle_unary_prefix(UNARY_PLUS, it);
-        case DPLUS: return handle_unary_prefix(POSTFIX_INC, it);
-        case MINUS: return handle_unary_prefix(UNARY_PLUS, it);
-        case DMINUS: return handle_unary_prefix(POSTFIX_DEC, it);
-        case TILDE: return handle_unary_prefix(BINARY_NOT, it);
-        case EXCLMARK: return handle_unary_prefix(LOGICAL_NOT, it);
-        case STAR: return handle_unary_prefix(DEREFERENCE, it);
-        case AND: return handle_unary_prefix(ADDRESS_OF, it);
+        case PLUS: return parse_unary_prefix(UNARY_PLUS, it);
+        case DPLUS: return parse_unary_prefix(POSTFIX_INC, it);
+        case MINUS: return parse_unary_prefix(UNARY_PLUS, it);
+        case DMINUS: return parse_unary_prefix(POSTFIX_DEC, it);
+        case TILDE: return parse_unary_prefix(BINARY_NOT, it);
+        case EXCLMARK: return parse_unary_prefix(LOGICAL_NOT, it);
+        case STAR: return parse_unary_prefix(DEREFERENCE, it);
+        case AND: return parse_unary_prefix(ADDRESS_OF, it);
 
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
@@ -1524,7 +1712,7 @@ Stmt parse_function(const Token** it) {
     stmt.data.fun.name = name;
 
     // parameters
-    if (parse_params(it, start,
+    if (parse_params(it,
         &stmt.data.fun.paramc, &stmt.data.fun.optc,
         &stmt.data.fun.paramv, &stmt.data.fun.paramt, &stmt.data.fun.paramd
     )) return (Stmt) { ERROR_STMT, 0, 0, {} };
@@ -1635,7 +1823,7 @@ Stmt parse_struct(const Token** it) {
     stmt.data.structdef.name = name;
 
     // members
-    if (parse_params(it, start,
+    if (parse_params(it,
         &stmt.data.structdef.paramc, &stmt.data.structdef.optc,
         &stmt.data.structdef.paramv, &stmt.data.structdef.paramt, &stmt.data.structdef.paramd
     )) return (Stmt) { ERROR_STMT, 0, 0, {} };
@@ -1864,6 +2052,23 @@ void free_expr(Expr expr) {
             free(expr.data.op.second);
             free_expr(*expr.data.op.third);
             free(expr.data.op.third);
+            break;
+
+        case SUBSRIPT_EXPR:
+            free_expr(*expr.data.subscript.arr);
+            free(expr.data.subscript.arr);
+            free_expr(*expr.data.subscript.idx);
+            free(expr.data.subscript.idx);
+            break;
+        case CALL_EXPR:
+        case CONSTRUCTOR_EXPR:
+            free_expr(*expr.data.call.fun);
+            free(expr.data.call.fun);
+            free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+            break;
+        case ACCESS_EXPR:
+            free_expr(*expr.data.access.obj);
+            free(expr.data.access.obj);
             break;
     }
 }
