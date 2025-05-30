@@ -3,6 +3,9 @@
 #include "tokenizer.h"
 #include <stdbool.h>
 
+struct Type;
+typedef struct Type Type;
+
 typedef struct TypeSpec TypeSpec;
 typedef struct Expr Expr;
 typedef struct Stmt Stmt;
@@ -175,6 +178,8 @@ struct Expr {
     ExprEnum type;
     size_t line, col;
     ExprData data;
+
+    Type* annotation;
 };
 
 enum StmtEnum {

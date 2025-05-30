@@ -3,8 +3,9 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-typedef uint64_t literal_t;
-#define PRIliteral PRIu64
+typedef int64_t literal_t;
+#define PRIliteral PRIi64
+#define LITERAL_TYPE I64_TYPE
 
 typedef struct Token Token;
 
