@@ -1,9 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "parser.h"
 #include "printerr.h"
 #include "readfile.h"
 #include "tokenizer.h"
-#include "parser.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 void print_indent(size_t depth) {
     for (size_t i = 0; i < depth; i++) printf("    ");
@@ -14,7 +15,7 @@ void print_spec(TypeSpec spec, size_t depth) {
     printf("type (%d):%zu:%zu", spec.type, spec.line, spec.col);
 
     switch (spec.type) {
-        case ERROR_SPEC: printf(" (error)\n"); break;
+        case ERROR_SPEC:    printf(" (error)\n"); break;
         case INFERRED_SPEC: printf(" (inferred)\n"); break;
         case GROUPED_SPEC:
             printf(" ()\n");
@@ -45,7 +46,7 @@ void print_expr(Expr expr, size_t depth) {
 
     switch (expr.type) {
         case ERROR_EXPR: printf(" (error)\n"); break;
-        case NO_EXPR: printf(" (empty)\n"); break;
+        case NO_EXPR:    printf(" (empty)\n"); break;
         case GROUPED_EXPR:
             printf(" ()\n");
             print_expr(*expr.data.group, depth + 1);
@@ -61,10 +62,9 @@ void print_expr(Expr expr, size_t depth) {
             printf(" ()=>\n");
             for (size_t i = 0; i < expr.data.lambda.paramc; i++) {
                 print_indent(depth + 1);
-                printf("param   :%zu:%zu %s\n",
-                    expr.data.lambda.paramv[i].line,
-                    expr.data.lambda.paramv[i].col,
-                    expr.data.lambda.paramv[i].str
+                printf(
+                    "param   :%zu:%zu %s\n", expr.data.lambda.paramv[i].line,
+                    expr.data.lambda.paramv[i].col, expr.data.lambda.paramv[i].str
                 );
                 print_spec(expr.data.lambda.paramt[i], depth + 1);
                 print_expr(expr.data.lambda.paramd[i], depth + 1);
@@ -118,7 +118,7 @@ void print_stmt(Stmt stmt, size_t depth) {
 
     switch (stmt.type) {
         case ERROR_STMT: printf(" (error)\n"); break;
-        case NOP: printf(" (nop)\n"); break;
+        case NOP:        printf(" (nop)\n"); break;
         case BLOCK:
             printf(" {}\n");
             for (size_t i = 0; i < stmt.data.block.len; i++) {
@@ -153,7 +153,9 @@ void print_stmt(Stmt stmt, size_t depth) {
                 if (i == stmt.data.switchcase.defaulti) {
                     print_indent(depth + 1);
                     printf("default\n");
-                } else print_expr(stmt.data.switchcase.casev[i], depth + 1);
+                } else {
+                    print_expr(stmt.data.switchcase.casev[i], depth + 1);
+                }
                 print_stmt(stmt.data.switchcase.branchv[i], depth + 1);
             }
             break;
@@ -178,10 +180,9 @@ void print_stmt(Stmt stmt, size_t depth) {
             printf(" fn %s\n", stmt.data.fun.name.str);
             for (size_t i = 0; i < stmt.data.fun.paramc; i++) {
                 print_indent(depth + 1);
-                printf("param   :%zu:%zu %s\n",
-                    stmt.data.fun.paramv[i].line,
-                    stmt.data.fun.paramv[i].col,
-                    stmt.data.fun.paramv[i].str
+                printf(
+                    "param   :%zu:%zu %s\n", stmt.data.fun.paramv[i].line,
+                    stmt.data.fun.paramv[i].col, stmt.data.fun.paramv[i].str
                 );
                 print_spec(stmt.data.fun.paramt[i], depth + 1);
                 print_expr(stmt.data.fun.paramd[i], depth + 1);
@@ -193,10 +194,9 @@ void print_stmt(Stmt stmt, size_t depth) {
             printf(" struct %s\n", stmt.data.structdef.name.str);
             for (size_t i = 0; i < stmt.data.structdef.paramc; i++) {
                 print_indent(depth + 1);
-                printf("member  :%zu:%zu %s\n",
-                    stmt.data.structdef.paramv[i].line,
-                    stmt.data.structdef.paramv[i].col,
-                    stmt.data.structdef.paramv[i].str
+                printf(
+                    "member  :%zu:%zu %s\n", stmt.data.structdef.paramv[i].line,
+                    stmt.data.structdef.paramv[i].col, stmt.data.structdef.paramv[i].str
                 );
                 print_spec(stmt.data.structdef.paramt[i], depth + 1);
                 print_expr(stmt.data.structdef.paramd[i], depth + 1);
@@ -206,10 +206,9 @@ void print_stmt(Stmt stmt, size_t depth) {
             printf(" enum %s\n", stmt.data.enumdef.name.str);
             for (size_t i = 0; i < stmt.data.enumdef.len; i++) {
                 print_indent(depth + 1);
-                printf("value   :%zu:%zu %s\n",
-                    stmt.data.enumdef.items[i].line,
-                    stmt.data.enumdef.items[i].col,
-                    stmt.data.enumdef.items[i].str
+                printf(
+                    "value   :%zu:%zu %s\n", stmt.data.enumdef.items[i].line,
+                    stmt.data.enumdef.items[i].col, stmt.data.enumdef.items[i].str
                 );
             }
             break;
@@ -217,7 +216,7 @@ void print_stmt(Stmt stmt, size_t depth) {
             printf(" return\n");
             print_expr(stmt.data.expr, depth + 1);
             break;
-        case BREAK_STMT: printf(" break\n"); break;
+        case BREAK_STMT:    printf(" break\n"); break;
         case CONTINUE_STMT: printf(" continue\n"); break;
     }
 }

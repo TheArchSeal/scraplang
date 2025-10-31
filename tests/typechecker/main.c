@@ -1,10 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "parser.h"
 #include "printerr.h"
 #include "readfile.h"
 #include "tokenizer.h"
-#include "parser.h"
 #include "typechecker.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 int main(int argc, char** argv) {
     if (argc != 2) {

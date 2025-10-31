@@ -1,6 +1,7 @@
 #include "printerr.h"
-#include <stdio.h>
+
 #include <stdarg.h>
+#include <stdio.h>
 
 const char* error_filename = NULL;
 size_t error_line = 0, error_col = 0;

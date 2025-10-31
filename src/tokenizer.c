@@ -1,7 +1,9 @@
 #include "tokenizer.h"
-#include "printerr.h"
+
 #include <stdlib.h>
 #include <string.h>
+
+#include "printerr.h"
 
 typedef struct TokenMapItem TokenMapItem;
 struct TokenMapItem {
@@ -9,84 +11,30 @@ struct TokenMapItem {
     TokenEnum val;
 };
 const TokenMapItem keywords[] = {
-    { "var",        VAR_TOKEN       },
-    { "const",      CONST_TOKEN     },
-    { "fn",         FN_TOKEN        },
-    { "wire",       WIRE_TOKEN      },
-    { "part",       PART_TOKEN      },
-    { "primitive",  PRIMITIVE_TOKEN },
-    { "struct",     STRUCT_TOKEN    },
-    { "enum",       ENUM_TOKEN      },
-    { "if",         IF_TOKEN        },
-    { "else",       ELSE_TOKEN      },
-    { "switch",     SWITCH_TOKEN    },
-    { "case",       CASE_TOKEN      },
-    { "default",    DEFAULT_TOKEN   },
-    { "while",      WHILE_TOKEN     },
-    { "do",         DO_TOKEN        },
-    { "for",        FOR_TOKEN       },
-    { "return",     RETURN_TOKEN    },
-    { "break",      BREAK_TOKEN     },
-    { "continue",   CONTINUE_TOKEN  },
-    { "type",       TYPE_TOKEN      },
-    { "void",       VOID_TOKEN      },
-    { "bool",       BOOL_TOKEN      },
-    { "i8",         I8_TOKEN        },
-    { "i16",        I16_TOKEN       },
-    { "i32",        I32_TOKEN       },
-    { "i64",        I64_TOKEN       },
-    { "u8",         U8_TOKEN        },
-    { "u16",        U16_TOKEN       },
-    { "u32",        U32_TOKEN       },
-    { "u64",        U64_TOKEN       },
+    { "var", VAR_TOKEN },           { "const", CONST_TOKEN },   { "fn", FN_TOKEN },
+    { "wire", WIRE_TOKEN },         { "part", PART_TOKEN },     { "primitive", PRIMITIVE_TOKEN },
+    { "struct", STRUCT_TOKEN },     { "enum", ENUM_TOKEN },     { "if", IF_TOKEN },
+    { "else", ELSE_TOKEN },         { "switch", SWITCH_TOKEN }, { "case", CASE_TOKEN },
+    { "default", DEFAULT_TOKEN },   { "while", WHILE_TOKEN },   { "do", DO_TOKEN },
+    { "for", FOR_TOKEN },           { "return", RETURN_TOKEN }, { "break", BREAK_TOKEN },
+    { "continue", CONTINUE_TOKEN }, { "type", TYPE_TOKEN },     { "void", VOID_TOKEN },
+    { "bool", BOOL_TOKEN },         { "i8", I8_TOKEN },         { "i16", I16_TOKEN },
+    { "i32", I32_TOKEN },           { "i64", I64_TOKEN },       { "u8", U8_TOKEN },
+    { "u16", U16_TOKEN },           { "u32", U32_TOKEN },       { "u64", U64_TOKEN },
 };
 const TokenMapItem symbols[] = {
-    { "(",          LPAREN          },
-    { ")",          RPAREN          },
-    { "[",          LBRACKET        },
-    { "]",          RBRACKET        },
-    { "{",          LBRACE          },
-    { "}",          RBRACE          },
-    { "+",          PLUS            },
-    { "++",         DPLUS           },
-    { "-",          MINUS           },
-    { "--",         DMINUS          },
-    { "*",          STAR            },
-    { "/",          SLASH           },
-    { "%",          PERCENT         },
-    { "|",          PIPE            },
-    { "||",         DPIPE           },
-    { "&",          AND             },
-    { "&&",         DAND            },
-    { "^",          CARET           },
-    { "~",          TILDE           },
-    { "!",          EXCLMARK        },
-    { "?",          QMARK           },
-    { "=",          EQ_TOKEN        },
-    { "==",         DEQ_TOKEN       },
-    { "!=",         NEQ_TOKEN       },
-    { "<",          LT_TOKEN        },
-    { "<<",         DLT_TOKEN       },
-    { "<=",         LEQ_TOKEN       },
-    { ">",          GT_TOKEN        },
-    { ">>",         DGT_TOKEN       },
-    { ">=",         GEQ_TOKEN       },
-    { "+=",         PLUSEQ          },
-    { "-=",         MINUSEQ         },
-    { "*=",         STAREQ          },
-    { "/=",         SLASHEQ         },
-    { "%=",         PERCENTEQ       },
-    { "|=",         PIPEEQ          },
-    { "&=",         ANDEQ           },
-    { "^=",         CARETEQ         },
-    { "<<=",        DLTEQ           },
-    { ">>=",        DGTEQ           },
-    { "->",         ARROW           },
-    { "=>",         DARROW          },
-    { ".",          DOT             },
-    { ",",          COMMA           },
-    { ":",          COLON           },
-    { ";",          SEMICOLON       },
+    { "(", LPAREN },     { ")", RPAREN },     { "[", LBRACKET },   { "]", RBRACKET },
+    { "{", LBRACE },     { "}", RBRACE },     { "+", PLUS },       { "++", DPLUS },
+    { "-", MINUS },      { "--", DMINUS },    { "*", STAR },       { "/", SLASH },
+    { "%", PERCENT },    { "|", PIPE },       { "||", DPIPE },     { "&", AND },
+    { "&&", DAND },      { "^", CARET },      { "~", TILDE },      { "!", EXCLMARK },
+    { "?", QMARK },      { "=", EQ_TOKEN },   { "==", DEQ_TOKEN }, { "!=", NEQ_TOKEN },
+    { "<", LT_TOKEN },   { "<<", DLT_TOKEN }, { "<=", LEQ_TOKEN }, { ">", GT_TOKEN },
+    { ">>", DGT_TOKEN }, { ">=", GEQ_TOKEN }, { "+=", PLUSEQ },    { "-=", MINUSEQ },
+    { "*=", STAREQ },    { "/=", SLASHEQ },   { "%=", PERCENTEQ }, { "|=", PIPEEQ },
+    { "&=", ANDEQ },     { "^=", CARETEQ },   { "<<=", DLTEQ },    { ">>=", DGTEQ },
+    { "->", ARROW },     { "=>", DARROW },    { ".", DOT },        { ",", COMMA },
+    { ":", COLON },      { ";", SEMICOLON },
 };
 
 void free_token(Token token);
@@ -114,9 +62,7 @@ bool is_num(char chr) {
 
 // Check whether chr is a hexadecimal digit.
 bool is_hex(char chr) {
-    return is_num(chr)
-        || ('a' <= chr && chr <= 'f')
-        || ('A' <= chr && chr <= 'F');
+    return is_num(chr) || ('a' <= chr && chr <= 'f') || ('A' <= chr && chr <= 'F');
 }
 
 // Check whether chr is a letter or digit.
@@ -232,7 +178,7 @@ const char* literal_name(char quote) {
     switch (quote) {
         case '\'': return "character";
         case '\"': return "string";
-        default: return NULL;
+        default:   return NULL;
     }
 }
 
@@ -268,13 +214,13 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
                 case 't':  str[i++] = '\t'; break;
                 case '0':  str[i++] = '\0'; break;
 
-                case 'x': // numeric escape sequence
+                case 'x':  // numeric escape sequence
                     // left digit
                     char hi = *++it;
                     if (hi == '\0') {
                         syntax_error(
-                            "invalid escape sequence '\\x' in %s literal %s\n",
-                            literal_name(quote), src
+                            "invalid escape sequence '\\x' in %s literal %s\n", literal_name(quote),
+                            src
                         );
                         free(str);
                         return true;
@@ -284,8 +230,8 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
                     char lo = *++it;
                     if (hi == '\0') {
                         syntax_error(
-                            "invalid escape sequence '\\x%c' in %s literal %s\n",
-                            hi, literal_name(quote), src
+                            "invalid escape sequence '\\x%c' in %s literal %s\n", hi,
+                            literal_name(quote), src
                         );
                         free(str);
                         return true;
@@ -296,18 +242,18 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
                         str[i++] = parse_digit(hi) * 16 + parse_digit(lo);
                     } else {
                         syntax_error(
-                            "invalid escape sequence '\\x%c%c' in %s literal %s\n",
-                            hi, lo, literal_name(quote), src
+                            "invalid escape sequence '\\x%c%c' in %s literal %s\n", hi, lo,
+                            literal_name(quote), src
                         );
                         free(str);
                         return true;
                     }
                     break;
 
-                default: // invalid escape sequence
+                default:  // invalid escape sequence
                     syntax_error(
-                        "invalid escape sequence '\\%c' in %s literal %s\n",
-                        *it, literal_name(quote), src
+                        "invalid escape sequence '\\%c' in %s literal %s\n", *it,
+                        literal_name(quote), src
                     );
                     free(str);
                     return true;
@@ -384,14 +330,12 @@ Token* tokenize(const char* program, size_t tabsize) {
 
     char chr;
     do {
-        chr = *program++; // pop a character
-        bool push_token = false; // whether current token is finished
+        chr = *program++;         // pop a character
+        bool push_token = false;  // whether current token is finished
 
         switch (chr) {
             // end token on whitespace or EOF
-            case '\0':
-                push_token = true;
-                break;
+            case '\0': push_token = true; break;
             case ' ':
                 col++;
                 push_token = true;
@@ -412,17 +356,17 @@ Token* tokenize(const char* program, size_t tabsize) {
                 push_token = true;
                 break;
 
-            case '#': // comment
+            case '#':  // comment
                 // skip until end of line or file
                 do {
                     chr = *program++;
                     col++;
                 } while (chr != '\0' && chr != '\n');
-                chr = *program--; // don't skip the end of line or file
+                chr = *program--;  // don't skip the end of line or file
                 push_token = true;
                 break;
 
-            case '\'': // character and string literals
+            case '\'':  // character and string literals
             case '\"':
                 // end previous token first
                 if (tokenlen) {
@@ -443,8 +387,8 @@ Token* tokenize(const char* program, size_t tabsize) {
                             error_line = tokenline;
                             error_col = tokencol;
                             syntax_error(
-                                "missing terminating %c character in %s literal %.*s\n",
-                                quote, literal_name(quote), tokenlen, tokenpos
+                                "missing terminating %c character in %s literal %.*s\n", quote,
+                                literal_name(quote), tokenlen, tokenpos
                             );
                             free_token_arrn(array, length);
                             return NULL;
@@ -544,7 +488,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                 }
 
                 // push token
-                array[length++] = (Token){
+                array[length++] = (Token) {
                     .type = tokentype,
                     .str = str,
                     .line = tokenline,
@@ -566,7 +510,7 @@ Token* tokenize(const char* program, size_t tabsize) {
     } while (chr);
 
     // add EOF terminator
-    array[length] = (Token){
+    array[length] = (Token) {
         .type = EOF_TOKEN,
         .str = NULL,
         .line = line,
@@ -580,17 +524,14 @@ Token* tokenize(const char* program, size_t tabsize) {
 void free_token(Token token) {
     switch (token.type) {
         case ERROR_TOKEN:
-        case EOF_TOKEN:
-            break;
+        case EOF_TOKEN:   break;
 
         case STR_LITERAL:
             free(token.str);
             free(token.data.str_literal);
             break;
 
-        default:
-            free(token.str);
-            break;
+        default: free(token.str); break;
     }
 }
 

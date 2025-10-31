@@ -1,9 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "parser.h"
 #include "printerr.h"
 #include "readfile.h"
 #include "tokenizer.h"
-#include "parser.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -27,11 +28,21 @@ int main(int argc, char** argv) {
     // for (Token* it = tokens; it->type != EOF_TOKEN; it++) {
     //     printf("(%d)\t%s", it->type, it->str);
     //     switch (it->type) {
-    //         case INT_LITERAL: printf("\t%"PRIliteral"\n", it->data.int_literal); break;
-    //         case CHR_LITERAL: printf("\t%c\n", it->data.chr_literal); break;
-    //         case STR_LITERAL: printf("\t%s\n", it->data.str_literal); break;
-    //         case VAR_NAME: printf("\t%s\n", it->data.var_name); break;
-    //         default: printf("\n"); break;
+    //         case INT_LITERAL:
+    //             printf("\t%" PRIliteral "\n", it->data.int_literal);
+    //             break;
+    //         case CHR_LITERAL:
+    //             printf("\t%c\n", it->data.chr_literal);
+    //             break;
+    //         case STR_LITERAL:
+    //             printf("\t%s\n", it->data.str_literal);
+    //             break;
+    //         case VAR_NAME:
+    //             printf("\t%s\n", it->data.var_name);
+    //             break;
+    //         default:
+    //             printf("\n");
+    //             break;
     //     }
     // }
 

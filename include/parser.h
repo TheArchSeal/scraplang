@@ -1,7 +1,8 @@
 #pragma once
 
-#include "tokenizer.h"
 #include <stdbool.h>
+
+#include "tokenizer.h"
 
 struct Type;
 typedef struct Type Type;

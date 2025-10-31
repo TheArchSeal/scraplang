@@ -1,8 +1,10 @@
 #include "readfile.h"
-#include "printerr.h"
+
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+
+#include "printerr.h"
 
 // Read entire file to string.
 // Returns NULL on error.

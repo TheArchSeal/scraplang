@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stddef.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 typedef int64_t literal_t;
 #define PRIliteral PRIi64
@@ -18,29 +18,29 @@ enum TokenEnum {
     STR_LITERAL,
     VAR_NAME,
 
-    LPAREN,     // (
-    RPAREN,     // )
-    LBRACKET,   // [
-    RBRACKET,   // ]
-    LBRACE,     // {
-    RBRACE,     // }
+    LPAREN,    // (
+    RPAREN,    // )
+    LBRACKET,  // [
+    RBRACKET,  // ]
+    LBRACE,    // {
+    RBRACE,    // }
 
-    PLUS,       // +
-    DPLUS,      // ++
-    MINUS,      // -
-    DMINUS,     // --
-    STAR,       // *
-    SLASH,      // /
-    PERCENT,    // %
+    PLUS,     // +
+    DPLUS,    // ++
+    MINUS,    // -
+    DMINUS,   // --
+    STAR,     // *
+    SLASH,    // /
+    PERCENT,  // %
 
-    PIPE,       // |
-    DPIPE,      // ||
-    AND,        // &
-    DAND,       // &&
-    CARET,      // ^
-    TILDE,      // ~
-    EXCLMARK,   // !
-    QMARK,      // ?
+    PIPE,      // |
+    DPIPE,     // ||
+    AND,       // &
+    DAND,      // &&
+    CARET,     // ^
+    TILDE,     // ~
+    EXCLMARK,  // !
+    QMARK,     // ?
 
     EQ_TOKEN,   // =
     DEQ_TOKEN,  // ==
@@ -63,8 +63,8 @@ enum TokenEnum {
     DLTEQ,      // <<=
     DGTEQ,      // >>=
 
-    ARROW,      // ->
-    DARROW,     // =>
+    ARROW,   // ->
+    DARROW,  // =>
 
     DOT,        // .
     COMMA,      // ,
