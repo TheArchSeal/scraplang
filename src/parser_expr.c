@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common_parser.h"
+#include "parser_common.h"
 #include "printerr.h"
 
 Expr parse_postfix(const Token** it, Expr term);

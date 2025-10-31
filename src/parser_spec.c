@@ -1,8 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common_parser.h"
-#include "dynarr.h"
+#include "parser_common.h"
 #include "printerr.h"
 
 TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base);
