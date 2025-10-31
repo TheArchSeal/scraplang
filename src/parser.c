@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dynarr.h"
 #include "printerr.h"
 
 // initial precedence for parse_expr
@@ -19,10 +20,13 @@ Stmt parse_stmt(const Token** it);
 
 void free_spec(TypeSpec spec);
 void free_spec_arrn(TypeSpec* arr, size_t n);
+void free_spec_dynarr(DynArr* arr);
 void free_expr(Expr expr);
 void free_expr_arrn(Expr* arr, size_t n);
+void free_expr_dynarr(DynArr* arr);
 void free_stmt(Stmt stmt);
 void free_stmt_arrn(Stmt* arr, size_t n);
+void free_stmt_dynarr(DynArr* arr);
 
 // Write error message to stderr.
 void unexpected_token(Token token) {
@@ -201,61 +205,20 @@ bool parse_params(
 ) {
     // x: a, y = 1
 
-    // initialize arrays
-    size_t length = 0, capacity = 1;
-    Token* name_array = malloc(sizeof(Token) * capacity);
-    TypeSpec* type_array = malloc(sizeof(TypeSpec) * capacity);
-    Expr* def_array = malloc(sizeof(Expr) * capacity);
-    if (name_array == NULL || type_array == NULL || def_array == NULL) {
-        malloc_error();
-        free(name_array);
-        free(type_array);
-        free(def_array);
-        return true;
-    }
+    DynArr name_array = dynarr_create(sizeof(Token));
+    DynArr type_array = dynarr_create(sizeof(TypeSpec));
+    DynArr def_array = dynarr_create(sizeof(Expr));
 
     size_t optional = 0;
     if ((*it)->type == VAR_NAME) {
         for (;;) {
-            // expand arrays when out of capacity
-            if (length >= capacity) {
-                capacity *= 2;
-                Token* new_name_array = realloc(name_array, sizeof(Token) * capacity);
-                if (new_name_array == NULL) {
-                    malloc_error();
-                    free(name_array);
-                    free_spec_arrn(type_array, length);
-                    free_expr_arrn(def_array, length);
-                    return true;
-                }
-                name_array = new_name_array;
-                TypeSpec* new_spec_array = realloc(type_array, sizeof(TypeSpec) * capacity);
-                if (new_spec_array == NULL) {
-                    malloc_error();
-                    free(name_array);
-                    free_spec_arrn(type_array, length);
-                    free_expr_arrn(def_array, length);
-                    return true;
-                }
-                type_array = new_spec_array;
-                Expr* new_def_array = realloc(def_array, sizeof(Expr) * capacity);
-                if (new_def_array == NULL) {
-                    malloc_error();
-                    free(name_array);
-                    free_spec_arrn(type_array, length);
-                    free_expr_arrn(def_array, length);
-                    return true;
-                }
-                def_array = new_def_array;
-            }
-
             // next parameter name
             Token name = **it;
             if (name.type != VAR_NAME) {
                 unexpected_token(name);
-                free(name_array);
-                free_spec_arrn(type_array, length);
-                free_expr_arrn(def_array, length);
+                dynarr_destroy(&name_array);
+                free_spec_dynarr(&type_array);
+                free_expr_dynarr(&def_array);
                 return true;
             }
             (*it)++;
@@ -267,9 +230,9 @@ bool parse_params(
 
                 spec = parse_type_spec(it);
                 if (spec.type == ERROR_SPEC) {
-                    free(name_array);
-                    free_spec_arrn(type_array, length);
-                    free_expr_arrn(def_array, length);
+                    dynarr_destroy(&name_array);
+                    free_spec_dynarr(&type_array);
+                    free_expr_dynarr(&def_array);
                     return true;
                 }
             }
@@ -281,9 +244,10 @@ bool parse_params(
 
                 def = parse_expr(it, MAX_PRECEDENCE);
                 if (def.type == ERROR_EXPR) {
-                    free(name_array);
-                    free_spec_arrn(type_array, length);
-                    free_expr_arrn(def_array, length);
+                    free_spec(spec);
+                    dynarr_destroy(&name_array);
+                    free_spec_dynarr(&type_array);
+                    free_expr_dynarr(&def_array);
                     return true;
                 }
 
@@ -292,17 +256,27 @@ bool parse_params(
                 error_line = name.line;
                 error_col = name.col;
                 syntax_error("non-optional parameter after optional parameter\n");
-                free(name_array);
-                free_spec_arrn(type_array, length);
-                free_expr_arrn(def_array, length);
+                free_spec(spec);
+                free_expr(def);
+                dynarr_destroy(&name_array);
+                free_spec_dynarr(&type_array);
+                free_expr_dynarr(&def_array);
                 return true;
             }
 
             // push to arrays
-            memcpy(&name_array[length], &name, sizeof(Token));
-            memcpy(&type_array[length], &spec, sizeof(TypeSpec));
-            memcpy(&def_array[length], &def, sizeof(TypeSpec));
-            length++;
+            if (dynarr_append(&name_array, &name) || dynarr_append(&type_array, &spec) ||
+                dynarr_append(&def_array, &def))
+            {
+                malloc_error();
+                free_spec(spec);
+                free_expr(def);
+                free_expr(def);
+                dynarr_destroy(&name_array);
+                free_spec_dynarr(&type_array);
+                free_expr_dynarr(&def_array);
+                return true;
+            }
 
             // comma or end of list
             if ((*it)->type == COMMA) (*it)++;
@@ -310,11 +284,11 @@ bool parse_params(
         }
     }
 
-    if (len_dst) *len_dst = length;
+    if (len_dst) *len_dst = name_array.length;
     if (opt_dst) *opt_dst = optional;
-    if (names_dst) *names_dst = name_array;
-    if (types_dst) *types_dst = type_array;
-    if (defs_dst) *defs_dst = def_array;
+    if (names_dst) *names_dst = name_array.c_arr;
+    if (types_dst) *types_dst = type_array.c_arr;
+    if (defs_dst) *defs_dst = def_array.c_arr;
     return false;
 }
 
@@ -324,35 +298,22 @@ bool parse_params(
 bool parse_args(const Token** it, size_t* len_dst, Expr** vals_dst) {
     // x, y, z
 
-    // initialize array
-    size_t length = 0, capacity = 1;
-    Expr* array = malloc(sizeof(Expr) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return true;
-    }
-
+    DynArr array = dynarr_create(sizeof(Expr));
     if (is_expr(it)) {
         for (;;) {
-            // expand array when out of capacity
-            if (length >= capacity) {
-                capacity *= 2;
-                Expr* new_array = realloc(array, sizeof(Expr) * capacity);
-                if (new_array == NULL) {
-                    malloc_error();
-                    free_expr_arrn(array, length);
-                    return true;
-                }
-                array = new_array;
-            }
-
             // next argument
             Expr item = parse_expr(it, MAX_PRECEDENCE);
             if (item.type == ERROR_EXPR) {
-                free_expr_arrn(array, length);
+                free_expr_dynarr(&array);
                 return true;
             }
-            memcpy(&array[length++], &item, sizeof(Expr));
+
+            if (dynarr_append(&array, &item)) {
+                malloc_error();
+                free_expr(item);
+                free_expr_dynarr(&array);
+                return true;
+            }
 
             // comma or end of list
             if ((*it)->type == COMMA) (*it)++;
@@ -360,8 +321,8 @@ bool parse_args(const Token** it, size_t* len_dst, Expr** vals_dst) {
         }
     }
 
-    if (len_dst) *len_dst = length;
-    if (vals_dst) *vals_dst = array;
+    if (len_dst) *len_dst = array.length;
+    if (vals_dst) *vals_dst = array.c_arr;
     return false;
 }
 
@@ -404,37 +365,23 @@ TypeSpec parse_fun_spec(const Token** it) {
     // (
     Token start = *(*it)++;
 
-    // initialize array
-    size_t length = 0, capacity = 1;
-    TypeSpec* array = malloc(sizeof(TypeSpec) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
-    }
-
+    DynArr array = dynarr_create(sizeof(TypeSpec));
     // number of optional parameters
     size_t optional = 0;
     if ((*it)->type != RPAREN) {
         for (;;) {
-            // expand array when out of capacity
-            if (length >= capacity) {
-                capacity *= 2;
-                TypeSpec* new_array = realloc(array, sizeof(TypeSpec) * capacity);
-                if (new_array == NULL) {
-                    malloc_error();
-                    free_spec_arrn(array, length);
-                    return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
-                }
-                array = new_array;
-            }
-
             // next parameter type
             TypeSpec item = parse_type_spec(it);
             if (item.type == ERROR_SPEC) {
-                free_spec_arrn(array, length);
+                free_spec_dynarr(&array);
                 return item;
             }
-            memcpy(&array[length++], &item, sizeof(TypeSpec));
+
+            if (dynarr_append(&array, &item)) {
+                malloc_error();
+                free_spec(item);
+                free_spec_dynarr(&array);
+            }
 
             // optionally ?
             if ((*it)->type == QMARK) {
@@ -445,7 +392,7 @@ TypeSpec parse_fun_spec(const Token** it) {
                 error_line = start.line;
                 error_col = start.col;
                 syntax_error("non-optional parameter after optional parameter\n");
-                free_spec_arrn(array, length);
+                free_spec_dynarr(&array);
                 return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
             }
 
@@ -454,7 +401,7 @@ TypeSpec parse_fun_spec(const Token** it) {
             else if ((*it)->type == RPAREN) break;
             else {
                 unexpected_token(**it);
-                free_spec_arrn(array, length);
+                free_spec_dynarr(&array);
                 return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
             }
         }
@@ -464,7 +411,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     // =>
     if ((*it)->type != DARROW) {
         unexpected_token(**it);
-        free_spec_arrn(array, length);
+        free_spec_dynarr(&array);
         return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
     }
     (*it)++;
@@ -472,7 +419,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     // return type
     TypeSpec ret = parse_type_spec(it);
     if (ret.type == ERROR_SPEC) {
-        free_spec_arrn(array, length);
+        free_spec_dynarr(&array);
         return ret;
     }
 
@@ -480,15 +427,15 @@ TypeSpec parse_fun_spec(const Token** it) {
     spec.type = FUN_SPEC;
     spec.line = start.line;
     spec.col = start.col;
-    spec.data.fun.paramc = length;
+    spec.data.fun.paramc = array.length;
     spec.data.fun.optc = optional;
-    spec.data.fun.paramt = array;
+    spec.data.fun.paramt = array.c_arr;
 
     // allocations
     spec.data.fun.ret = malloc(sizeof(TypeSpec));
     if (spec.data.fun.ret == NULL) {
         malloc_error();
-        free_spec_arrn(array, length);
+        free_spec_dynarr(&array);
         free_spec(ret);
         return (TypeSpec) { ERROR_SPEC, 0, 0, {} };
     }
@@ -1106,41 +1053,29 @@ Stmt parse_block(const Token** it) {
     Token start = **it;
 
     // initialize array
-    size_t length = 0, capacity = 1;
-    Stmt* array = malloc(sizeof(Stmt) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return (Stmt) { ERROR_STMT, 0, 0, {} };
-    }
-
+    DynArr array = dynarr_create(sizeof(Stmt));
     while (is_statement(it)) {
-        // expand array when out of capacity
-        if (length >= capacity) {
-            capacity *= 2;
-            Stmt* new_array = realloc(array, sizeof(Stmt) * capacity);
-            if (new_array == NULL) {
-                malloc_error();
-                free_stmt_arrn(array, length);
-                return (Stmt) { ERROR_STMT, 0, 0, {} };
-            }
-            array = new_array;
-        }
-
         // next statement
         Stmt item = parse_stmt(it);
         if (item.type == ERROR_STMT) {
-            free_stmt_arrn(array, length);
+            free_stmt_dynarr(&array);
             return item;
         }
-        memcpy(&array[length++], &item, sizeof(Stmt));
+
+        if (dynarr_append(&array, &item)) {
+            malloc_error();
+            free_stmt(item);
+            free_stmt_dynarr(&array);
+            return (Stmt) { ERROR_STMT, 0, 0, {} };
+        }
     }
 
     Stmt stmt;
     stmt.type = BLOCK;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.block.len = length;
-    stmt.data.block.stmts = array;
+    stmt.data.block.len = array.length;
+    stmt.data.block.stmts = array.c_arr;
     return stmt;
 }
 
@@ -1362,43 +1297,11 @@ Stmt parse_switch(const Token** it) {
     }
     (*it)++;
 
-    // initialize arrays
-    size_t length = 0, capacity = 1;
-    Expr* case_array = malloc(sizeof(Expr) * capacity);
-    Stmt* branch_array = malloc(sizeof(Stmt) * capacity);
-    if (case_array == NULL || branch_array == NULL) {
-        malloc_error();
-        free_expr(expr);
-        free(case_array);
-        free(branch_array);
-        return (Stmt) { ERROR_STMT, 0, 0, {} };
-    }
+    DynArr case_array = dynarr_create(sizeof(Expr));
+    DynArr branch_array = dynarr_create(sizeof(Stmt));
 
-    size_t default_index = length;
+    size_t default_index = 0;
     while ((*it)->type != RBRACE) {
-        // expand arrays when out of capacity
-        if (length >= capacity) {
-            capacity *= 2;
-            Expr* new_case_array = realloc(case_array, sizeof(Expr) * capacity);
-            if (new_case_array == NULL) {
-                malloc_error();
-                free_expr(expr);
-                free_expr_arrn(case_array, length);
-                free_stmt_arrn(branch_array, length);
-                return (Stmt) { ERROR_STMT, 0, 0, {} };
-            }
-            case_array = new_case_array;
-            Stmt* new_branch_array = realloc(branch_array, sizeof(Stmt) * capacity);
-            if (new_branch_array == NULL) {
-                malloc_error();
-                free_expr(expr);
-                free_expr_arrn(case_array, length);
-                free_stmt_arrn(branch_array, length);
-                return (Stmt) { ERROR_STMT, 0, 0, {} };
-            }
-            branch_array = new_branch_array;
-        }
-
         // case or default
         Expr case_value = { NO_EXPR, (*it)->line, (*it)->col, {}, NULL };
         switch ((*it)->type) {
@@ -1408,22 +1311,22 @@ Stmt parse_switch(const Token** it) {
                 case_value = parse_expr(it, MAX_PRECEDENCE);
                 if (case_value.type == ERROR_EXPR) {
                     free_expr(expr);
-                    free_expr_arrn(case_array, length);
-                    free_stmt_arrn(branch_array, length);
+                    free_expr_dynarr(&case_array);
+                    free_stmt_dynarr(&branch_array);
                     return (Stmt) { ERROR_STMT, 0, 0, {} };
                 }
                 // if default not found, keep default index out of bounds
-                if (default_index == length) default_index++;
+                if (default_index == case_array.length) default_index++;
                 break;
             case DEFAULT_TOKEN:
                 // already encountered default
-                if (default_index != length) {
+                if (default_index != case_array.length) {
                     error_line = (*it)->line;
                     error_col = (*it)->col;
                     syntax_error("multiple default labels in switch\n");
                     free_expr(expr);
-                    free_expr_arrn(case_array, length);
-                    free_stmt_arrn(branch_array, length);
+                    free_expr_dynarr(&case_array);
+                    free_stmt_dynarr(&branch_array);
                     return (Stmt) { ERROR_STMT, 0, 0, {} };
                 }
                 (*it)++;
@@ -1432,8 +1335,8 @@ Stmt parse_switch(const Token** it) {
             default:
                 unexpected_token(**it);
                 free_expr(expr);
-                free_expr_arrn(case_array, length);
-                free_stmt_arrn(branch_array, length);
+                free_expr_dynarr(&case_array);
+                free_stmt_dynarr(&branch_array);
                 return (Stmt) { ERROR_STMT, 0, 0, {} };
         }
 
@@ -1442,8 +1345,8 @@ Stmt parse_switch(const Token** it) {
             unexpected_token(**it);
             free_expr(expr);
             free_expr(case_value);
-            free_expr_arrn(case_array, length);
-            free_stmt_arrn(branch_array, length);
+            free_expr_dynarr(&case_array);
+            free_stmt_dynarr(&branch_array);
             return (Stmt) { ERROR_STMT, 0, 0, {} };
         }
         (*it)++;
@@ -1453,14 +1356,21 @@ Stmt parse_switch(const Token** it) {
         if (branch_value.type == ERROR_STMT) {
             free_expr(expr);
             free_expr(case_value);
-            free_expr_arrn(case_array, length);
-            free_stmt_arrn(branch_array, length);
+            free_expr_dynarr(&case_array);
+            free_stmt_dynarr(&branch_array);
             return (Stmt) { ERROR_STMT, 0, 0, {} };
         }
 
-        memcpy(&case_array[length], &case_value, sizeof(Expr));
-        memcpy(&branch_array[length], &branch_value, sizeof(Stmt));
-        length++;
+        if (dynarr_append(&case_array, &case_value) || dynarr_append(&branch_array, &branch_value))
+        {
+            malloc_error();
+            free_expr(expr);
+            free_expr(case_value);
+            free_stmt(branch_value);
+            free_expr_dynarr(&case_array);
+            free_stmt_dynarr(&branch_array);
+            return (Stmt) { ERROR_STMT, 0, 0, {} };
+        }
     }
     (*it)++;
 
@@ -1469,9 +1379,9 @@ Stmt parse_switch(const Token** it) {
     stmt.line = start.line;
     stmt.col = start.col;
     stmt.data.switchcase.expr = expr;
-    stmt.data.switchcase.casec = length;
-    stmt.data.switchcase.casev = case_array;
-    stmt.data.switchcase.branchv = branch_array;
+    stmt.data.switchcase.casec = case_array.length;
+    stmt.data.switchcase.casev = case_array.c_arr;
+    stmt.data.switchcase.branchv = branch_array.c_arr;
     stmt.data.switchcase.defaulti = default_index;
     return stmt;
 }
@@ -1887,43 +1797,31 @@ Stmt parse_enum(const Token** it) {
     (*it)++;
 
     // initialize array
-    size_t length = 0, capacity = 1;
-    Token* array = malloc(sizeof(Token) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return (Stmt) { ERROR_STMT, 0, 0, {} };
-    }
+    DynArr array = dynarr_create(sizeof(Token));
 
     if ((*it)->type != RBRACE) {
         for (;;) {
-            // expand array when out of capacity
-            if (length >= capacity) {
-                capacity *= 2;
-                Token* new_array = realloc(array, sizeof(Token) * capacity);
-                if (new_array == NULL) {
-                    malloc_error();
-                    free(array);
-                    return (Stmt) { ERROR_STMT, 0, 0, {} };
-                }
-                array = new_array;
-            }
-
             // element in enum
             Token item = **it;
             if (item.type != VAR_NAME) {
                 unexpected_token(item);
-                free(array);
+                dynarr_destroy(&array);
                 return (Stmt) { ERROR_STMT, 0, 0, {} };
             }
             (*it)++;
-            memcpy(&array[length++], &item, sizeof(Token));
+
+            if (dynarr_append(&array, &item)) {
+                malloc_error();
+                dynarr_destroy(&array);
+                return (Stmt) { ERROR_STMT, 0, 0, {} };
+            }
 
             // comma or closing parenthesis
             if ((*it)->type == COMMA) (*it)++;
             else if ((*it)->type == RBRACE) break;
             else {
                 unexpected_token(**it);
-                free(array);
+                dynarr_destroy(&array);
                 return (Stmt) { ERROR_STMT, 0, 0, {} };
             }
         }
@@ -1935,8 +1833,8 @@ Stmt parse_enum(const Token** it) {
     stmt.line = start.line;
     stmt.col = start.col;
     stmt.data.enumdef.name = name;
-    stmt.data.enumdef.len = length;
-    stmt.data.enumdef.items = array;
+    stmt.data.enumdef.len = array.length;
+    stmt.data.enumdef.items = array.c_arr;
     return stmt;
 }
 
@@ -2086,6 +1984,12 @@ void free_spec_arrn(TypeSpec* arr, size_t n) {
     free(arr);
 }
 
+// Free dynamic type specifier array all data inside it.
+void free_spec_dynarr(DynArr* arr) {
+    for (size_t i = 0; i < arr->length; i++) free_spec(*(TypeSpec*)dynarr_get(arr, i));
+    dynarr_destroy(arr);
+}
+
 // Free all data inside expression.
 void free_expr(Expr expr) {
     switch (expr.type) {
@@ -2148,6 +2052,12 @@ void free_expr(Expr expr) {
 void free_expr_arrn(Expr* arr, size_t n) {
     for (size_t i = 0; i < n; i++) free_expr(arr[i]);
     free(arr);
+}
+
+// Free dynamic expression array all data inside it.
+void free_expr_dynarr(DynArr* arr) {
+    for (size_t i = 0; i < arr->length; i++) free_expr(*(Expr*)dynarr_get(arr, i));
+    dynarr_destroy(arr);
 }
 
 // Free all data inside statement.
@@ -2218,6 +2128,12 @@ void free_stmt(Stmt stmt) {
 void free_stmt_arrn(Stmt* arr, size_t n) {
     for (size_t i = 0; i < n; i++) free_stmt(arr[i]);
     free(arr);
+}
+
+// Free dynamic statement array all all data inside it.
+void free_stmt_dynarr(DynArr* arr) {
+    for (size_t i = 0; i < arr->length; i++) free_stmt(*(Stmt*)dynarr_get(arr, i));
+    dynarr_destroy(arr);
 }
 
 // Free non-tagged abstract syntax tree token and all data inside it.

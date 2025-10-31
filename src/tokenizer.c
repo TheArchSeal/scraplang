@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dynarr.h"
 #include "printerr.h"
 
 typedef struct TokenMapItem TokenMapItem;
@@ -39,6 +40,7 @@ const TokenMapItem symbols[] = {
 
 void free_token(Token token);
 void free_token_arrn(Token* arr, size_t n);
+void free_token_dynarr(DynArr* arr);
 
 // Check whether chr is a lowercase letter.
 bool is_lower(char chr) {
@@ -311,13 +313,7 @@ bool parse_chr(char* dst, const char* src, size_t src_len) {
 Token* tokenize(const char* program, size_t tabsize) {
     if (program == NULL) return NULL;
 
-    // initialize array
-    size_t length = 0, capacity = 1;
-    Token* array = malloc(sizeof(Token) * capacity);
-    if (array == NULL) {
-        malloc_error();
-        return NULL;
-    }
+    DynArr array = dynarr_create(sizeof(Token));
 
     // initialize position
     size_t line = 1, col = 1;
@@ -390,7 +386,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                                 "missing terminating %c character in %s literal %.*s\n", quote,
                                 literal_name(quote), tokenlen, tokenpos
                             );
-                            free_token_arrn(array, length);
+                            free_token_dynarr(&array);
                             return NULL;
                         }
                     } while (chr != quote || escaping);
@@ -429,27 +425,15 @@ Token* tokenize(const char* program, size_t tabsize) {
                 // check that token is valid
                 if (tokentype == ERROR_TOKEN) {
                     syntax_error("invalid token '%.*s'\n", tokenlen, tokenpos);
-                    free_token_arrn(array, length);
+                    free_token_dynarr(&array);
                     return NULL;
-                }
-
-                // expand array when out of capacity
-                if (length + 1 >= capacity) {
-                    capacity *= 2;
-                    Token* new_array = realloc(array, sizeof(Token) * capacity);
-                    if (new_array == NULL) {
-                        malloc_error();
-                        free_token_arrn(array, length);
-                        return NULL;
-                    }
-                    array = new_array;
                 }
 
                 // copy token to new string
                 char* str = malloc(tokenlen + 1);
                 if (str == NULL) {
                     malloc_error();
-                    free_token_arrn(array, length);
+                    free_token_dynarr(&array);
                     return NULL;
                 }
                 strncpy(str, tokenpos, tokenlen);
@@ -460,21 +444,21 @@ Token* tokenize(const char* program, size_t tabsize) {
                 switch (tokentype) {
                     case INT_LITERAL:
                         if (parse_int(&data.int_literal, str)) {
-                            free_token_arrn(array, length);
+                            free_token_dynarr(&array);
                             free(str);
                             return NULL;
                         }
                         break;
                     case CHR_LITERAL:
                         if (parse_chr(&data.chr_literal, str, tokenlen)) {
-                            free_token_arrn(array, length);
+                            free_token_dynarr(&array);
                             free(str);
                             return NULL;
                         }
                         break;
                     case STR_LITERAL:
                         if (parse_str(&data.str_literal, NULL, str, tokenlen)) {
-                            free_token_arrn(array, length);
+                            free_token_dynarr(&array);
                             free(str);
                             return NULL;
                         }
@@ -488,13 +472,18 @@ Token* tokenize(const char* program, size_t tabsize) {
                 }
 
                 // push token
-                array[length++] = (Token) {
+                Token token = {
                     .type = tokentype,
                     .str = str,
                     .line = tokenline,
                     .col = tokencol,
                     .data = data,
                 };
+                if (dynarr_append(&array, &token)) {
+                    malloc_error();
+                    dynarr_destroy(&array);
+                    return NULL;
+                }
 
                 // clear token
                 tokentype = ERROR_TOKEN;
@@ -510,14 +499,19 @@ Token* tokenize(const char* program, size_t tabsize) {
     } while (chr);
 
     // add EOF terminator
-    array[length] = (Token) {
+    Token eof = {
         .type = EOF_TOKEN,
         .str = NULL,
         .line = line,
         .col = col,
     };
+    if (dynarr_append(&array, &eof)) {
+        malloc_error();
+        dynarr_destroy(&array);
+        return NULL;
+    }
 
-    return array;
+    return array.c_arr;
 }
 
 // Free all data inside token.
@@ -540,6 +534,13 @@ void free_token_arrn(Token* arr, size_t n) {
     if (arr == NULL) return;
     for (size_t i = 0; i < n; i++) free_token(arr[i]);
     free(arr);
+}
+
+// Free generic token array and all token data inside it.
+void free_token_dynarr(DynArr* arr) {
+    if (arr == NULL) return;
+    for (size_t i = 0; i < arr->length; i++) free_token(*(Token*)dynarr_get(arr, i));
+    dynarr_destroy(arr);
 }
 
 // Free EOF terminated token array and all token data inside it.

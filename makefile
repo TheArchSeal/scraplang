@@ -10,6 +10,8 @@ TEST_BIN_DIR=$(BIN_DIR)/tests
 TEST_OBJ_DIR=$(BUILD_DIR)/tests
 TEST_COMMAND=./test.sh
 
+ANALYZE_COMMAND=./analyze.sh
+
 CC=gcc
 CFLAGS=-g -Wall -Wextra -Wpedantic -Werror -std=c2x -I$(INC_DIR) -D__USE_MINGW_ANSI_STDIO=1 -MMD -MP
 
@@ -37,7 +39,7 @@ TEST_SOURCES=$(foreach category,$(TEST_CATEGORIES),$(wildcard $(TEST_DIR)/$(cate
 TEST_OBJECTS=$(patsubst $(TEST_DIR)/%.c,$(TEST_OBJ_DIR)/%.o,$(TEST_SOURCES))
 TEST_DEPS=$(TEST_OBJECTS:.o=.d)
 
-.PHONY: build all test clean
+.PHONY: build all test analysis clean
 
 build: $(TARGET)
 
@@ -45,6 +47,9 @@ all: $(TARGET) $(TEST_TARGETS)
 
 test: $(TEST_TARGETS)
 	@-$(BASH) $(TEST_COMMAND)
+
+analysis:
+	@-$(BASH) $(ANALYZE_COMMAND)
 
 clean:
 	-$(RMDIR) $(BIN_DIR) $(BUILD_DIR)
