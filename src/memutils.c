@@ -1,7 +1,19 @@
-#include "dynarr.h"
+#include "memutils.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+#include "printerr.h"
+
+void* malloc_struct(void* elem, size_t size) {
+    void* ptr = malloc(size);
+    if (ptr == NULL) {
+        malloc_error();
+        return NULL;
+    }
+    memcpy(ptr, elem, size);
+    return ptr;
+}
 
 DynArr dynarr_create(size_t elem_size) {
     return (DynArr) { .c_arr = NULL, .elem_size = elem_size, .length = 0, .capacity = 0 };
@@ -23,7 +35,10 @@ bool dynarr_append(DynArr* arr, void* elem) {
         size_t cap = arr->capacity ? arr->capacity * 2 : 1;
 
         void* new = realloc(arr->c_arr, cap * arr->elem_size);
-        if (new == NULL) return true;
+        if (new == NULL) {
+            malloc_error();
+            return true;
+        }
 
         arr->capacity = cap;
         arr->c_arr = new;

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct DynArr DynArr;
+void* malloc_struct(void* elem, size_t size);
 
+typedef struct DynArr DynArr;
 struct DynArr {
     void* c_arr;
     size_t elem_size;

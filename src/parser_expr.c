@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <string.h>
 
 #include "parser_common.h"
 #include "printerr.h"
@@ -98,15 +97,10 @@ Expr parse_expr_group(const Token** it) {
 
     // inner expression
     Expr group = parse_expr(it, MAX_PRECEDENCE);
-    if (group.type == ERROR_EXPR) return group;
+    if (group.type == ERROR_EXPR) goto err;
 
     // )
-    if ((*it)->type != RPAREN) {
-        unexpected_token(**it);
-        free_expr(group);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, RPAREN)) goto err_free_group;
 
     Expr expr;
     expr.type = GROUPED_EXPR;
@@ -115,15 +109,14 @@ Expr parse_expr_group(const Token** it) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.group = malloc(sizeof(Expr));
-    if (expr.data.group == NULL) {
-        malloc_error();
-        free_expr(group);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.group, &group, sizeof(Expr));
+    expr.data.group = malloc_struct(&group, sizeof(Expr));
+    if (expr.data.group == NULL) goto err_free_group;
 
     return expr;
+err_free_group:
+    free_expr(group);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_array_literal(const Token** it) {
@@ -139,19 +132,16 @@ Expr parse_array_literal(const Token** it) {
     expr.annotation = NULL;
 
     // items
-    if (parse_args(it, &expr.data.arr.len, &expr.data.arr.items)) {
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
+    if (parse_args(it, &expr.data.arr.len, &expr.data.arr.items)) goto err;
 
     // ]
-    if ((*it)->type != RBRACKET) {
-        unexpected_token(**it);
-        free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, RBRACKET)) goto err_free_args;
 
     return expr;
+err_free_args:
+    free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_lambda(const Token** it) {
@@ -172,51 +162,31 @@ Expr parse_lambda(const Token** it) {
             &expr.data.lambda.paramt, &expr.data.lambda.paramd
         ))
     {
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
+        goto err;
     }
 
-    // )
-    if ((*it)->type != RPAREN) {
-        unexpected_token(**it);
-        free(expr.data.lambda.paramv);
-        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
-        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
+    // ) =>
+    if (consume_expected_token(it, RPAREN) || consume_expected_token(it, DARROW)) {
+        goto err_free_params;
     }
-    (*it)++;
-
-    // =>
-    if ((*it)->type != DARROW) {
-        unexpected_token(**it);
-        free(expr.data.lambda.paramv);
-        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
-        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
 
     // lambda body
     Expr body = parse_expr(it, MAX_PRECEDENCE);
-    if (body.type == ERROR_EXPR) {
-        free(expr.data.lambda.paramv);
-        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
-        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
-        return body;
-    }
+    if (body.type == ERROR_EXPR) goto err_free_params;
 
     // allocations
-    expr.data.lambda.expr = malloc(sizeof(Expr));
-    if (expr.data.lambda.expr == NULL) {
-        malloc_error();
-        free(expr.data.lambda.paramv);
-        free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
-        free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
-        free_expr(body);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.lambda.expr, &body, sizeof(Expr));
+    expr.data.lambda.expr = malloc_struct(&body, sizeof(Expr));
+    if (expr.data.lambda.expr == NULL) goto err_free_body;
 
     return expr;
+err_free_body:
+    free_expr(body);
+err_free_params:
+    free(expr.data.lambda.paramv);
+    free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
+    free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_subscript(const Token** it, Expr term) {
@@ -227,15 +197,10 @@ Expr parse_subscript(const Token** it, Expr term) {
 
     // index
     Expr idx = parse_expr(it, MAX_PRECEDENCE);
-    if (idx.type == ERROR_EXPR) return idx;
+    if (idx.type == ERROR_EXPR) goto err;
 
     // ]
-    if ((*it)->type != RBRACKET) {
-        unexpected_token(**it);
-        free_expr(idx);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, RBRACKET)) goto err_free_idx;
 
     Expr expr;
     expr.type = SUBSRIPT_EXPR;
@@ -244,25 +209,22 @@ Expr parse_subscript(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.subscript.arr = malloc(sizeof(Expr));
-    expr.data.subscript.idx = malloc(sizeof(Expr));
-    if (expr.data.subscript.arr == NULL || expr.data.subscript.idx == NULL) {
-        malloc_error();
-        free_expr(idx);
-        free(expr.data.subscript.arr);
-        free(expr.data.subscript.idx);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.subscript.arr, &term, sizeof(Expr));
-    memcpy(expr.data.subscript.idx, &idx, sizeof(Expr));
+    expr.data.subscript.arr = malloc_struct(&term, sizeof(Expr));
+    expr.data.subscript.idx = malloc_struct(&idx, sizeof(Expr));
+    if (expr.data.subscript.arr == NULL || expr.data.subscript.idx == NULL) goto err_free_allocs;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
-    if (next.type == ERROR_EXPR) {
-        free_expr(expr);
-        return next;
-    }
+    if (next.type == ERROR_EXPR) goto err_free_allocs;
+
     return next;
+err_free_allocs:
+    free(expr.data.subscript.arr);
+    free(expr.data.subscript.idx);
+err_free_idx:
+    free_expr(idx);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_call(const Token** it, Expr term) {
@@ -278,34 +240,26 @@ Expr parse_call(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // arguments
-    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) {
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
+    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) goto err;
 
     // )
-    if ((*it)->type != RPAREN) {
-        unexpected_token(**it);
-        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, RPAREN)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = malloc(sizeof(Expr));
-    if (expr.data.call.fun == NULL) {
-        malloc_error();
-        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.call.fun, &term, sizeof(Expr));
+    expr.data.call.fun = malloc_struct(&term, sizeof(Expr));
+    if (expr.data.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
-    if (next.type == ERROR_EXPR) {
-        free_expr(expr);
-        return next;
-    }
+    if (next.type == ERROR_EXPR) goto err_free_alloc;
+
     return next;
+err_free_alloc:
+    free(expr.data.call.fun);
+err_free_args:
+    free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_constructor(const Token** it, Expr term) {
@@ -321,34 +275,26 @@ Expr parse_constructor(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // arguments
-    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) {
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
+    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) goto err;
 
     // }
-    if ((*it)->type != RBRACE) {
-        unexpected_token(**it);
-        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, RBRACE)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = malloc(sizeof(Expr));
-    if (expr.data.call.fun == NULL) {
-        malloc_error();
-        free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.call.fun, &term, sizeof(Expr));
+    expr.data.call.fun = malloc_struct(&term, sizeof(Expr));
+    if (expr.data.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
-    if (next.type == ERROR_EXPR) {
-        free_expr(expr);
-        return next;
-    }
+    if (next.type == ERROR_EXPR) goto err_free_expr_alloc;
+
     return next;
+err_free_expr_alloc:
+    free(expr.data.call.fun);
+err_free_args:
+    free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_access(const Token** it, Expr term) {
@@ -359,11 +305,7 @@ Expr parse_access(const Token** it, Expr term) {
 
     // variable name
     Token member = **it;
-    if (member.type != VAR_NAME) {
-        unexpected_token(member);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    (*it)++;
+    if (consume_expected_token(it, VAR_NAME)) goto err;
 
     Expr expr;
     expr.type = ACCESS_EXPR;
@@ -373,20 +315,18 @@ Expr parse_access(const Token** it, Expr term) {
     expr.data.access.memeber = member;
 
     // allocations
-    expr.data.access.obj = malloc(sizeof(Expr));
-    if (expr.data.access.obj == NULL) {
-        malloc_error();
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.access.obj, &term, sizeof(Expr));
+    expr.data.access.obj = malloc_struct(&term, sizeof(Expr));
+    if (expr.data.access.obj == NULL) goto err;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
-    if (next.type == ERROR_EXPR) {
-        free_expr(expr);
-        return next;
-    }
+    if (next.type == ERROR_EXPR) goto err_free_alloc;
+
     return next;
+err_free_alloc:
+    free(expr.data.access.obj);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
@@ -402,20 +342,18 @@ Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
     expr.data.op.token = token;
 
     // allocations
-    expr.data.op.first = malloc(sizeof(Expr));
-    if (expr.data.op.first == NULL) {
-        malloc_error();
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.op.first, &term, sizeof(Expr));
+    expr.data.op.first = malloc_struct(&term, sizeof(Expr));
+    if (expr.data.op.first == NULL) goto err;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
-    if (next.type == ERROR_EXPR) {
-        free_expr(expr);
-        return next;
-    }
+    if (next.type == ERROR_EXPR) goto err_free_alloc;
+
     return next;
+err_free_alloc:
+    free(expr.data.op.first);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_unary_prefix(OpEnum type, const Token** it) {
@@ -424,7 +362,7 @@ Expr parse_unary_prefix(OpEnum type, const Token** it) {
 
     // operand
     Expr term = parse_term(it);
-    if (term.type == ERROR_EXPR) return term;
+    if (term.type == ERROR_EXPR) goto err;
 
     Expr expr;
     expr.type = UNOP_EXPR;
@@ -435,15 +373,14 @@ Expr parse_unary_prefix(OpEnum type, const Token** it) {
     expr.data.op.token = token;
 
     // allocations
-    expr.data.op.first = malloc(sizeof(Expr));
-    if (expr.data.op.first == NULL) {
-        malloc_error();
-        free_expr(term);
-        return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-    }
-    memcpy(expr.data.op.first, &term, sizeof(Expr));
+    expr.data.op.first = malloc_struct(&term, sizeof(Expr));
+    if (expr.data.op.first == NULL) goto err_free_term;
 
     return expr;
+err_free_term:
+    free_expr(term);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_atomic_term(const Token** it) {
@@ -475,6 +412,9 @@ Expr parse_postfix(const Token** it, Expr term) {
 }
 
 Expr parse_term(const Token** it) {
+    Expr expr;
+    Expr next;
+
     switch ((*it)->type) {
         // atom
         case INT_LITERAL:
@@ -494,29 +434,37 @@ Expr parse_term(const Token** it) {
         case LBRACKET: return parse_array_literal(it);
         case LPAREN:
             // check if lambda expression
-            Expr expr = is_lambda(it) ? parse_lambda(it) : parse_expr_group(it);
+            expr = is_lambda(it) ? parse_lambda(it) : parse_expr_group(it);
             // postfix operators
-            Expr next = parse_postfix(it, expr);
-            if (next.type == ERROR_EXPR) {
-                free_expr(expr);
-                return next;
-            }
-            return next;
+            next = parse_postfix(it, expr);
+            if (next.type == ERROR_EXPR) goto err_free_expr;
+            break;
 
-        default: unexpected_token(**it); return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
+        default: unexpected_token(**it); goto err;
     }
+
+    return next;
+err_free_expr:
+    free_expr(expr);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }
 
 Expr parse_expr(const Token** it, size_t precedence) {
     // base case
     if (precedence == 0) return parse_term(it);
 
+    bool ternary;
+    Expr middle;
+    Expr rhs;
+    Expr expr;
+
     // whether current precedence is left-to-right associative
     bool right_to_left = operator_rtl_associative(precedence);
     // leftmost operand
     // must only contain operators of lesser precedence
     Expr lhs = parse_expr(it, precedence - 1);
-    if (lhs.type == ERROR_EXPR) return lhs;
+    if (lhs.type == ERROR_EXPR) goto err;
 
     for (;;) {
         Token token = **it;
@@ -526,36 +474,21 @@ Expr parse_expr(const Token** it, size_t precedence) {
         (*it)++;
 
         // whether operation is ternary
-        bool ternary = op == TERNARY;
-        Expr middle;
+        ternary = op == TERNARY;
         if (ternary) {
             // middle operator is unaffected by precedence
             middle = parse_expr(it, MAX_PRECEDENCE);
-            if (middle.type == ERROR_EXPR) {
-                free_expr(lhs);
-                return middle;
-            }
+            if (middle.type == ERROR_EXPR) goto err_free_lhs;
 
             // :
-            if ((*it)->type != COLON) {
-                unexpected_token(**it);
-                free_expr(lhs);
-                free_expr(middle);
-                return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-            }
-            (*it)++;
+            if (consume_expected_token(it, COLON)) goto err_free_middle;
         }
 
         // rightmost operand
         // can contain the same precedence operator iff right-to-left associative
-        Expr rhs = parse_expr(it, precedence - !right_to_left);
-        if (rhs.type == ERROR_EXPR) {
-            free_expr(lhs);
-            if (ternary) free_expr(middle);
-            return rhs;
-        }
+        rhs = parse_expr(it, precedence - !right_to_left);
+        if (rhs.type == ERROR_EXPR) goto err_free_middle;
 
-        Expr expr;
         expr.type = ternary ? TERNOP_EXPR : BINOP_EXPR;
         expr.line = lhs.line;
         expr.col = lhs.col;
@@ -564,34 +497,15 @@ Expr parse_expr(const Token** it, size_t precedence) {
         expr.data.op.token = token;
 
         // allocations
-        expr.data.op.first = malloc(sizeof(Expr));
-        expr.data.op.second = malloc(sizeof(Expr));
-        if (expr.data.op.first == NULL || expr.data.op.second == NULL) {
-            malloc_error();
-            free_expr(lhs);
-            if (ternary) free_expr(middle);
-            free_expr(rhs);
-            free(expr.data.op.first);
-            free(expr.data.op.second);
-            return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-        }
-        memcpy(expr.data.op.first, &lhs, sizeof(Expr));
-        memcpy(expr.data.op.second, &rhs, sizeof(Expr));
+        expr.data.op.first = malloc_struct(&lhs, sizeof(Expr));
+        expr.data.op.second = malloc_struct(&rhs, sizeof(Expr));
+        if (expr.data.op.first == NULL || expr.data.op.second == NULL) goto err_free_allocs;
 
         // rightmost operand is third and middle is second if ternary
         if (ternary) {
             expr.data.op.third = expr.data.op.second;
-            expr.data.op.second = malloc(sizeof(Expr));
-            if (expr.data.op.second == NULL) {
-                malloc_error();
-                free_expr(lhs);
-                free_expr(middle);
-                free_expr(rhs);
-                free(expr.data.op.first);
-                free(expr.data.op.third);
-                return (Expr) { ERROR_EXPR, 0, 0, {}, NULL };
-            }
-            memcpy(expr.data.op.second, &middle, sizeof(Expr));
+            expr.data.op.second = malloc_struct(&middle, sizeof(Expr));
+            if (expr.data.op.second == NULL) goto err_free_ternary_alloc;
         }
 
         // right-to-left will be done here but left-to-right must loop
@@ -602,4 +516,17 @@ Expr parse_expr(const Token** it, size_t precedence) {
             lhs = expr;
         }
     }
+
+err_free_ternary_alloc:
+    free(expr.data.op.third);
+err_free_allocs:
+    free(expr.data.op.second);
+    free(expr.data.op.first);
+    free_expr(rhs);
+err_free_middle:
+    if (ternary) free_expr(middle);
+err_free_lhs:
+    free_expr(lhs);
+err:
+    return (Expr) { .type = ERROR_EXPR };
 }

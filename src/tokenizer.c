@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dynarr.h"
+#include "memutils.h"
 #include "printerr.h"
 
 typedef struct TokenMapItem TokenMapItem;

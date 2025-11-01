@@ -1,7 +1,6 @@
 #include "parser_common.h"
 
 #include <stdlib.h>
-#include <string.h>
 
 #include "printerr.h"
 
@@ -16,6 +15,16 @@ void unexpected_token(Token token) {
         case STR_LITERAL: syntax_error("unexpected token %s\n", token.str); return;
         default:          syntax_error("unexpected token '%s'\n", token.str); return;
     }
+}
+
+bool consume_expected_token(const Token** it, TokenEnum type) {
+    if ((*it)->type != type) {
+        unexpected_token(**it);
+        return true;
+    }
+
+    (*it)++;
+    return false;
 }
 
 // Checks the next token to see if it could be an expression.
@@ -97,6 +106,9 @@ bool parse_params(
 ) {
     // x: a, y = 1
 
+    TypeSpec spec;
+    Expr def;
+
     DynArr name_array = dynarr_create(sizeof(Token));
     DynArr type_array = dynarr_create(sizeof(TypeSpec));
     DynArr def_array = dynarr_create(sizeof(Expr));
@@ -106,68 +118,38 @@ bool parse_params(
         for (;;) {
             // next parameter name
             Token name = **it;
-            if (name.type != VAR_NAME) {
-                unexpected_token(name);
-                dynarr_destroy(&name_array);
-                free_spec_dynarr(&type_array);
-                free_expr_dynarr(&def_array);
-                return true;
-            }
-            (*it)++;
+            if (consume_expected_token(it, VAR_NAME)) goto err_free_arrs;
 
             // optional parameter type specifier
-            TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
+            spec = (TypeSpec) { .type = INFERRED_SPEC, .line = name.line, .col = name.col };
             if ((*it)->type == COLON) {
                 (*it)++;
 
                 spec = parse_type_spec(it);
-                if (spec.type == ERROR_SPEC) {
-                    dynarr_destroy(&name_array);
-                    free_spec_dynarr(&type_array);
-                    free_expr_dynarr(&def_array);
-                    return true;
-                }
+                if (spec.type == ERROR_SPEC) goto err_free_arrs;
             }
 
             // optional default parameter
-            Expr def = { NO_EXPR, name.line, name.col, {}, NULL };
+            def = (Expr) { .type = NO_EXPR, .line = name.line, .col = name.col };
             if ((*it)->type == EQ_TOKEN) {
                 (*it)++;
 
                 def = parse_expr(it, MAX_PRECEDENCE);
-                if (def.type == ERROR_EXPR) {
-                    free_spec(spec);
-                    dynarr_destroy(&name_array);
-                    free_spec_dynarr(&type_array);
-                    free_expr_dynarr(&def_array);
-                    return true;
-                }
+                if (def.type == ERROR_EXPR) goto err_free_spec;
 
                 optional++;
             } else if (optional) {
                 error_line = name.line;
                 error_col = name.col;
                 syntax_error("non-optional parameter after optional parameter\n");
-                free_spec(spec);
-                free_expr(def);
-                dynarr_destroy(&name_array);
-                free_spec_dynarr(&type_array);
-                free_expr_dynarr(&def_array);
-                return true;
+                goto err_free_spec;
             }
 
             // push to arrays
             if (dynarr_append(&name_array, &name) || dynarr_append(&type_array, &spec) ||
                 dynarr_append(&def_array, &def))
             {
-                malloc_error();
-                free_spec(spec);
-                free_expr(def);
-                free_expr(def);
-                dynarr_destroy(&name_array);
-                free_spec_dynarr(&type_array);
-                free_expr_dynarr(&def_array);
-                return true;
+                goto err_free_def;
             }
 
             // comma or end of list
@@ -181,7 +163,17 @@ bool parse_params(
     if (names_dst) *names_dst = name_array.c_arr;
     if (types_dst) *types_dst = type_array.c_arr;
     if (defs_dst) *defs_dst = def_array.c_arr;
+
     return false;
+err_free_def:
+    free_expr(def);
+err_free_spec:
+    free_spec(spec);
+err_free_arrs:
+    dynarr_destroy(&name_array);
+    free_spec_dynarr(&type_array);
+    free_expr_dynarr(&def_array);
+    return true;
 }
 
 // Parse argument list without surrounding parentheses.
@@ -190,22 +182,16 @@ bool parse_params(
 bool parse_args(const Token** it, size_t* len_dst, Expr** vals_dst) {
     // x, y, z
 
+    Expr item;
+
     DynArr array = dynarr_create(sizeof(Expr));
     if (is_expr(it)) {
         for (;;) {
             // next argument
-            Expr item = parse_expr(it, MAX_PRECEDENCE);
-            if (item.type == ERROR_EXPR) {
-                free_expr_dynarr(&array);
-                return true;
-            }
+            item = parse_expr(it, MAX_PRECEDENCE);
+            if (item.type == ERROR_EXPR) goto err_free_arr;
 
-            if (dynarr_append(&array, &item)) {
-                malloc_error();
-                free_expr(item);
-                free_expr_dynarr(&array);
-                return true;
-            }
+            if (dynarr_append(&array, &item)) goto err_free_item;
 
             // comma or end of list
             if ((*it)->type == COMMA) (*it)++;
@@ -215,33 +201,35 @@ bool parse_args(const Token** it, size_t* len_dst, Expr** vals_dst) {
 
     if (len_dst) *len_dst = array.length;
     if (vals_dst) *vals_dst = array.c_arr;
+
     return false;
+err_free_item:
+    free_expr(item);
+err_free_arr:
+    free_expr_dynarr(&array);
+    return true;
 }
 
 // Parse EOF_TOKEN terminated token array.
 // Result is not tagged.
 // Returns NULL if an error occurred.
 AST* parse(const Token* program) {
-    if (program == NULL) return NULL;
+    if (program == NULL) goto err;
 
     const Token** it = &program;
     Stmt stmt = parse_block(it);
-    if (stmt.type == ERROR_STMT) return NULL;
+    if (stmt.type == ERROR_STMT) goto err;
 
-    if ((*it)->type != EOF_TOKEN) {
-        unexpected_token(**it);
-        free_stmt(stmt);
-        return NULL;
-    }
+    if (consume_expected_token(it, EOF_TOKEN)) goto err_free_stmt;
 
-    Stmt* ast = malloc(sizeof(Stmt));
-    if (ast == NULL) {
-        malloc_error();
-        free_stmt(stmt);
-        return NULL;
-    }
-    memcpy(ast, &stmt, sizeof(Stmt));
+    Stmt* ast = malloc_struct(&stmt, sizeof(Stmt));
+    if (ast == NULL) goto err_free_stmt;
+
     return ast;
+err_free_stmt:
+    free_stmt(stmt);
+err:
+    return NULL;
 }
 
 // Free all data inside type specifier.

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dynarr.h"
+#include "memutils.h"
 #include "parser.h"
 
 // initial precedence for parse_expr
@@ -12,6 +12,7 @@ Stmt parse_stmt(const Token** it);
 Stmt parse_block(const Token** it);
 
 void unexpected_token(Token token);
+bool consume_expected_token(const Token** it, TokenEnum type);
 
 bool is_expr(const Token* const* it);
 bool is_statement(const Token* const* it);
