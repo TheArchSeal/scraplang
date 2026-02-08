@@ -25,10 +25,10 @@ int main(int argc, char** argv) {
     for (Token* it = tokens; it->type != EOF_TOKEN; it++) {
         printf("(%d):%zu:%zu %s", it->type, it->line, it->col, it->str);
         switch (it->type) {
-            case INT_LITERAL: printf(" %" PRIliteral "\n", it->data.int_literal); break;
-            case CHR_LITERAL: printf(" %c\n", it->data.chr_literal); break;
-            case STR_LITERAL: printf(" %s\n", it->data.str_literal); break;
-            case VAR_NAME:    printf(" %s\n", it->data.var_name); break;
+            case INT_LITERAL: printf(" %" PRIliteral "\n", it->int_literal); break;
+            case CHR_LITERAL: printf(" %c\n", it->chr_literal); break;
+            case STR_LITERAL: printf(" %s\n", it->str_literal); break;
+            case IDENTIFIER:  printf(" %s\n", it->identifier); break;
             default:          printf("\n"); break;
         }
     }

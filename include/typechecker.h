@@ -71,24 +71,22 @@ typedef struct EnumTypeData EnumTypeData;
 typedef struct EnumItemData EnumItemData;
 typedef struct TypedefTypeData TypedefTypeData;
 
-union TypeData {
-    Token atom;
-    PtrTypeData ptr;
-    FunTypeData fun;
-    StructTypeData structtype;
-    EnumTypeData enumtype;
-    EnumItemData enumitem;
-    TypedefTypeData typedeftype;
-};
-
 typedef enum TypeEnum TypeEnum;
-typedef union TypeData TypeData;
 
 struct Type {
     TypeEnum type;
     bool lvalue;
     bool mutable;
-    TypeData data;
+
+    union {
+        Token atom;
+        PtrTypeData ptr;
+        FunTypeData fun;
+        StructTypeData structtype;
+        EnumTypeData enumtype;
+        EnumItemData enumitem;
+        TypedefTypeData typedeftype;
+    };
 };
 
 bool typecheck(AST* ast);

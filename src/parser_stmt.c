@@ -21,8 +21,8 @@ Stmt parse_block(const Token** it) {
     stmt.type = BLOCK;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.block.len = array.length;
-    stmt.data.block.stmts = array.c_arr;
+    stmt.block.len = array.length;
+    stmt.block.stmts = array.c_arr;
 
     return stmt;
 err_free_item:
@@ -41,14 +41,14 @@ Stmt parse_decl(const Token** it, bool mut) {
 
     // variable name
     Token name = **it;
-    if (consume_expected_token(it, VAR_NAME)) goto err;
+    if (consume_expected_token(it, IDENTIFIER)) goto err;
 
     // optionally : and type specifier
-    TypeSpec spec = { INFERRED_SPEC, name.line, name.col, {} };
+    Spec spec = { INFERRED_SPEC, name.line, name.col, {} };
     if ((*it)->type == COLON) {
         (*it)++;
 
-        spec = parse_type_spec(it);
+        spec = parse_spec(it);
         if (spec.type == ERROR_SPEC) goto err;
     }
 
@@ -66,10 +66,10 @@ Stmt parse_decl(const Token** it, bool mut) {
     stmt.type = DECL;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.decl.name = name;
-    stmt.data.decl.val = val;
-    stmt.data.decl.spec = spec;
-    stmt.data.decl.mutable = mut;
+    stmt.decl.name = name;
+    stmt.decl.val = val;
+    stmt.decl.spec = spec;
+    stmt.decl.mutable = mut;
 
     return stmt;
 err_free_val:
@@ -88,10 +88,10 @@ Stmt parse_typedef(const Token** it) {
 
     // variable name =
     Token name = **it;
-    if (consume_expected_token(it, VAR_NAME) || consume_expected_token(it, EQ_TOKEN)) goto err;
+    if (consume_expected_token(it, IDENTIFIER) || consume_expected_token(it, EQ_TOKEN)) goto err;
 
     // value
-    TypeSpec val = parse_type_spec(it);
+    Spec val = parse_spec(it);
     if (val.type == ERROR_SPEC) goto err;
 
     // ;
@@ -101,8 +101,8 @@ Stmt parse_typedef(const Token** it) {
     stmt.type = TYPEDEF;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.type.name = name;
-    stmt.data.type.val = val;
+    stmt.typedefdata.name = name;
+    stmt.typedefdata.val = val;
 
     return stmt;
 err_free_val:
@@ -137,9 +137,9 @@ Stmt parse_ifelse(const Token** it) {
     stmt.type = IFELSE_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.ifelse.condition = condition;
-    stmt.data.ifelse.on_true = NULL;
-    stmt.data.ifelse.on_false = NULL;
+    stmt.ifelse.condition = condition;
+    stmt.ifelse.on_true = NULL;
+    stmt.ifelse.on_false = NULL;
 
     // optionally else and branch
     if ((*it)->type == ELSE_TOKEN) {
@@ -149,18 +149,18 @@ Stmt parse_ifelse(const Token** it) {
         if (on_false.type == ERROR_STMT) goto err_free_true;
 
         // allocations
-        stmt.data.ifelse.on_false = MALLOC_STRUCT(on_false);
-        if (stmt.data.ifelse.on_false == NULL) goto err_free_false;
+        stmt.ifelse.on_false = MALLOC_STRUCT(on_false);
+        if (stmt.ifelse.on_false == NULL) goto err_free_false;
     }
 
     // allocations
-    stmt.data.ifelse.on_true = MALLOC_STRUCT(on_true);
-    if (stmt.data.ifelse.on_true == NULL) goto err_free_false_alloc;
+    stmt.ifelse.on_true = MALLOC_STRUCT(on_true);
+    if (stmt.ifelse.on_true == NULL) goto err_free_false_alloc;
 
     return stmt;
 err_free_false_alloc:
-    if (stmt.data.ifelse.on_false == NULL) goto err_free_true;
-    free(stmt.data.ifelse.on_false);
+    if (stmt.ifelse.on_false == NULL) goto err_free_true;
+    free(stmt.ifelse.on_false);
 err_free_false:
     free_stmt(on_false);
 err_free_true:
@@ -243,11 +243,11 @@ Stmt parse_switch(const Token** it) {
     stmt.type = SWITCH_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.switchcase.expr = expr;
-    stmt.data.switchcase.casec = case_array.length;
-    stmt.data.switchcase.casev = case_array.c_arr;
-    stmt.data.switchcase.branchv = branch_array.c_arr;
-    stmt.data.switchcase.defaulti = default_index;
+    stmt.switchcase.expr = expr;
+    stmt.switchcase.casec = case_array.length;
+    stmt.switchcase.casev = case_array.c_arr;
+    stmt.switchcase.branchv = branch_array.c_arr;
+    stmt.switchcase.defaulti = default_index;
 
     return stmt;
 err_free_branch_val:
@@ -287,11 +287,11 @@ Stmt parse_while(const Token** it) {
     stmt.type = WHILE_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.whileloop.condition = condition;
+    stmt.whileloop.condition = condition;
 
     // allocations
-    stmt.data.whileloop.body = MALLOC_STRUCT(body);
-    if (stmt.data.whileloop.body == NULL) goto err_free_body;
+    stmt.whileloop.body = MALLOC_STRUCT(body);
+    if (stmt.whileloop.body == NULL) goto err_free_body;
 
     return stmt;
 err_free_body:
@@ -330,11 +330,11 @@ Stmt parse_dowhile(const Token** it) {
     stmt.type = DOWHILE_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.whileloop.condition = condition;
+    stmt.whileloop.condition = condition;
 
     // allocations
-    stmt.data.whileloop.body = MALLOC_STRUCT(body);
-    if (stmt.data.whileloop.body == NULL) goto err_free_cond;
+    stmt.whileloop.body = MALLOC_STRUCT(body);
+    if (stmt.whileloop.body == NULL) goto err_free_cond;
 
     return stmt;
 err_free_cond:
@@ -398,18 +398,18 @@ Stmt parse_for(const Token** it) {
     stmt.type = FOR_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.forloop.condition = condition;
-    stmt.data.forloop.expr = expr;
+    stmt.forloop.condition = condition;
+    stmt.forloop.expr = expr;
 
     // allocations
-    stmt.data.forloop.init = MALLOC_STRUCT(init);
-    stmt.data.forloop.body = MALLOC_STRUCT(body);
-    if (stmt.data.forloop.init == NULL || stmt.data.forloop.body == NULL) goto err_free_allocs;
+    stmt.forloop.init = MALLOC_STRUCT(init);
+    stmt.forloop.body = MALLOC_STRUCT(body);
+    if (stmt.forloop.init == NULL || stmt.forloop.body == NULL) goto err_free_allocs;
 
     return stmt;
 err_free_allocs:
-    free(stmt.data.forloop.init);
-    free(stmt.data.forloop.body);
+    free(stmt.forloop.init);
+    free(stmt.forloop.body);
     free_stmt(body);
 err_free_expr:
     free_expr(expr);
@@ -429,18 +429,18 @@ Stmt parse_function(const Token** it) {
 
     // variable name (
     Token name = **it;
-    if (consume_expected_token(it, VAR_NAME) || consume_expected_token(it, LPAREN)) goto err;
+    if (consume_expected_token(it, IDENTIFIER) || consume_expected_token(it, LPAREN)) goto err;
 
     Stmt stmt;
     stmt.type = FUNCTION_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.fun.name = name;
+    stmt.fun.name = name;
 
     // parameters
     if (parse_params(
-            it, &stmt.data.fun.paramc, &stmt.data.fun.optc, &stmt.data.fun.paramv,
-            &stmt.data.fun.paramt, &stmt.data.fun.paramd
+            it, &stmt.fun.paramc, &stmt.fun.optc, &stmt.fun.paramv, &stmt.fun.paramt,
+            &stmt.fun.paramd
         ))
     {
         goto err;
@@ -450,12 +450,12 @@ Stmt parse_function(const Token** it) {
     if (consume_expected_token(it, RPAREN)) goto err_free_params;
 
     // optionally : and type specifier
-    stmt.data.fun.ret = (TypeSpec) { INFERRED_SPEC, start.line, start.col, {} };
+    stmt.fun.ret = (Spec) { INFERRED_SPEC, start.line, start.col, {} };
     if ((*it)->type == COLON) {
         (*it)++;
 
-        stmt.data.fun.ret = parse_type_spec(it);
-        if (stmt.data.fun.ret.type == ERROR_SPEC) goto err_free_params;
+        stmt.fun.ret = parse_spec(it);
+        if (stmt.fun.ret.type == ERROR_SPEC) goto err_free_params;
     }
 
     // {
@@ -469,18 +469,18 @@ Stmt parse_function(const Token** it) {
     if (consume_expected_token(it, RBRACE)) goto err_free_body;
 
     // allocations
-    stmt.data.fun.body = MALLOC_STRUCT(body);
-    if (stmt.data.fun.body == NULL) goto err_free_body;
+    stmt.fun.body = MALLOC_STRUCT(body);
+    if (stmt.fun.body == NULL) goto err_free_body;
 
     return stmt;
 err_free_body:
     free_stmt(body);
 err_free_ret:
-    free_spec(stmt.data.fun.ret);
+    free_spec(stmt.fun.ret);
 err_free_params:
-    free(stmt.data.fun.paramv);
-    free_spec_arrn(stmt.data.fun.paramt, stmt.data.fun.paramc);
-    free_expr_arrn(stmt.data.fun.paramd, stmt.data.fun.paramc);
+    free(stmt.fun.paramv);
+    free_spec_arrn(stmt.fun.paramt, stmt.fun.paramc);
+    free_expr_arrn(stmt.fun.paramd, stmt.fun.paramc);
 err:
     return (Stmt) { .type = ERROR_STMT };
 }
@@ -496,18 +496,18 @@ Stmt parse_struct(const Token** it) {
 
     // variable name {
     Token name = **it;
-    if (consume_expected_token(it, VAR_NAME) || consume_expected_token(it, LBRACE)) goto err;
+    if (consume_expected_token(it, IDENTIFIER) || consume_expected_token(it, LBRACE)) goto err;
 
     Stmt stmt;
     stmt.type = STRUCT_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.structdef.name = name;
+    stmt.structdef.name = name;
 
     // members
     if (parse_params(
-            it, &stmt.data.structdef.paramc, &stmt.data.structdef.optc, &stmt.data.structdef.paramv,
-            &stmt.data.structdef.paramt, &stmt.data.structdef.paramd
+            it, &stmt.structdef.paramc, &stmt.structdef.optc, &stmt.structdef.paramv,
+            &stmt.structdef.paramt, &stmt.structdef.paramd
         ))
     {
         goto err;
@@ -518,9 +518,9 @@ Stmt parse_struct(const Token** it) {
 
     return stmt;
 err_free_params:
-    free(stmt.data.structdef.paramv);
-    free_spec_arrn(stmt.data.structdef.paramt, stmt.data.structdef.paramc);
-    free_expr_arrn(stmt.data.structdef.paramd, stmt.data.structdef.paramc);
+    free(stmt.structdef.paramv);
+    free_spec_arrn(stmt.structdef.paramt, stmt.structdef.paramc);
+    free_expr_arrn(stmt.structdef.paramd, stmt.structdef.paramc);
 err:
     return (Stmt) { .type = ERROR_STMT };
 }
@@ -533,7 +533,7 @@ Stmt parse_enum(const Token** it) {
 
     // variable name {
     Token name = **it;
-    if (consume_expected_token(it, VAR_NAME) || consume_expected_token(it, LBRACE)) goto err;
+    if (consume_expected_token(it, IDENTIFIER) || consume_expected_token(it, LBRACE)) goto err;
 
     // initialize array
     DynArr array = dynarr_create(sizeof(Token));
@@ -542,7 +542,7 @@ Stmt parse_enum(const Token** it) {
         for (;;) {
             // element in enum
             Token item = **it;
-            if (consume_expected_token(it, VAR_NAME)) goto err_free_arr;
+            if (consume_expected_token(it, IDENTIFIER)) goto err_free_arr;
             if (dynarr_append(&array, &item)) goto err_free_arr;
 
             // comma or closing parenthesis
@@ -560,9 +560,9 @@ Stmt parse_enum(const Token** it) {
     stmt.type = ENUM_STMT;
     stmt.line = start.line;
     stmt.col = start.col;
-    stmt.data.enumdef.name = name;
-    stmt.data.enumdef.len = array.length;
-    stmt.data.enumdef.items = array.c_arr;
+    stmt.enumdef.name = name;
+    stmt.enumdef.len = array.length;
+    stmt.enumdef.items = array.c_arr;
 
     return stmt;
 err_free_arr:
@@ -604,14 +604,14 @@ Stmt parse_stmt(const Token** it) {
             (*it)++;
             if ((*it)->type == SEMICOLON) {
                 (*it)++;
-                stmt.data.expr = (Expr) { NO_EXPR, stmt.line, stmt.col, {}, NULL };
+                stmt.expr = (Expr) { NO_EXPR, stmt.line, stmt.col, {}, NULL };
                 break;
             }
             expr = parse_expr(it, MAX_PRECEDENCE);
             if (expr.type == ERROR_EXPR) goto err;
             // ;
             if (consume_expected_token(it, SEMICOLON)) goto err_free_expr;
-            stmt.data.expr = expr;
+            stmt.expr = expr;
             break;
         case BREAK_TOKEN:
             stmt.type = BREAK_STMT;
@@ -638,7 +638,7 @@ Stmt parse_stmt(const Token** it) {
             stmt.type = EXPR_STMT;
             stmt.line = expr.line;
             stmt.col = expr.col;
-            stmt.data.expr = expr;
+            stmt.expr = expr;
             break;
     }
 

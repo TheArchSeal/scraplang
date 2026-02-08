@@ -128,7 +128,7 @@ TokenEnum get_token_type(const char* str, size_t len) {
     token = get_symbol_type(str, len);
     if (token != ERROR_TOKEN) return token;
     if (is_int(str, len)) return INT_LITERAL;
-    if (is_var(str, len)) return VAR_NAME;
+    if (is_var(str, len)) return IDENTIFIER;
     return ERROR_TOKEN;
 }
 
@@ -432,36 +432,34 @@ Token* tokenize(const char* program, size_t tabsize) {
                 tokenstr = strndup(tokenpos, tokenlen);
                 if (tokenstr == NULL) goto err_free_arr;
 
+                Token token = {
+                    .type = tokentype,
+                    .str = tokenstr,
+                    .line = tokenline,
+                    .col = tokencol,
+                };
                 // add necessary data based on type
-                TokenData data = {};
                 switch (tokentype) {
                     case INT_LITERAL:
-                        if (parse_int(&data.int_literal, tokenstr)) goto err_free_tokenstr;
+                        if (parse_int(&token.int_literal, tokenstr)) goto err_free_tokenstr;
                         break;
                     case CHR_LITERAL:
-                        if (parse_chr(&data.chr_literal, tokenstr, tokenlen))
+                        if (parse_chr(&token.chr_literal, tokenstr, tokenlen))
                             goto err_free_tokenstr;
                         break;
                     case STR_LITERAL:
-                        if (parse_str(&data.str_literal, NULL, tokenstr, tokenlen))
+                        if (parse_str(&token.str_literal, NULL, tokenstr, tokenlen))
                             goto err_free_tokenstr;
                         break;
-                    case VAR_NAME:
+                    case IDENTIFIER:
                         // variable name is same as token string
-                        data.var_name = tokenstr;
+                        token.identifier = tokenstr;
                         break;
 
                     default: break;
                 }
 
                 // push token
-                Token token = {
-                    .type = tokentype,
-                    .str = tokenstr,
-                    .line = tokenline,
-                    .col = tokencol,
-                    .data = data,
-                };
                 if (dynarr_append(&array, &token)) goto err_free_tokenstr;
 
                 // clear token
@@ -502,7 +500,7 @@ void free_token(Token token) {
 
         case STR_LITERAL:
             free(token.str);
-            free(token.data.str_literal);
+            free(token.str_literal);
             break;
 
         default: free(token.str); break;

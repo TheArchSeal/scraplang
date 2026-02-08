@@ -29,15 +29,15 @@ Type lookup_symbol(SymbolTable* table, Token symbol) {
     if (table == NULL) {
         error_line = symbol.line;
         error_col = symbol.col;
-        type_error("identifier '%s' is undefined\n", symbol.data.var_name);
+        type_error("identifier '%s' is undefined\n", symbol.identifier);
         return (Type) { ERROR_TYPE, false, false, {} };
     }
     for (size_t i = 0; i < table->len; i++) {
-        if (strcmp(table->symbols[i], symbol.data.var_name) == 0) {
+        if (strcmp(table->symbols[i], symbol.identifier) == 0) {
             if (table->types[i].type == UNDEFINED_TYPE) {
                 error_line = symbol.line;
                 error_col = symbol.col;
-                type_error("identifier '%s' is undefined\n", symbol.data.var_name);
+                type_error("identifier '%s' is undefined\n", symbol.identifier);
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
             return table->types[i];
@@ -54,7 +54,7 @@ Type typecheck_atom(Token atom, SymbolTable* table) {
             Type chr = { U8_TYPE, false, false, {} };
             Type str = { ARR_TYPE, false, false, { .ptr = { &chr, false } } };
             return clone_type(str);
-        case VAR_NAME: return clone_type(lookup_symbol(table, atom));
+        case IDENTIFIER: return clone_type(lookup_symbol(table, atom));
 
         default: return (Type) { ERROR_TYPE, false, false, {} };
     }
@@ -65,8 +65,8 @@ Type typecheck_expr(Expr* expr, SymbolTable* table) {
     switch (expr->type) {
         case ERROR_EXPR:   return type;
         case NO_EXPR:      type = (Type) { VOID_TYPE, false, false, {} }; break;
-        case GROUPED_EXPR: type = typecheck_expr(expr->data.group, table); break;
-        case ATOMIC_EXPR:  type = typecheck_atom(expr->data.atom, table); break;
+        case GROUPED_EXPR: type = typecheck_expr(expr->group, table); break;
+        case ATOMIC_EXPR:  type = typecheck_atom(expr->atom, table); break;
         case ARR_EXPR:
         case LAMBDA_EXPR:
         case UNOP_EXPR:
@@ -91,8 +91,8 @@ Type typecheck_expr(Expr* expr, SymbolTable* table) {
 
 bool typecheck_block(Stmt* stmt, SymbolTable* table) {
     size_t length = 0;
-    for (size_t i = 0; i < stmt->data.block.len; i++) {
-        switch (stmt->data.block.stmts[i].type) {
+    for (size_t i = 0; i < stmt->block.len; i++) {
+        switch (stmt->block.stmts[i].type) {
             case ERROR_STMT: return true;
 
             case DECL:
@@ -128,23 +128,23 @@ bool typecheck_block(Stmt* stmt, SymbolTable* table) {
     }
 
     length = 0;
-    for (size_t i = 0; i < stmt->data.block.len; i++) {
-        Stmt decl = stmt->data.block.stmts[i];
+    for (size_t i = 0; i < stmt->block.len; i++) {
+        Stmt decl = stmt->block.stmts[i];
         switch (decl.type) {
-            case DECL:          scope.symbols[length++] = decl.data.decl.name.str; break;
-            case TYPEDEF:       scope.symbols[length++] = decl.data.type.name.str; break;
-            case FUNCTION_STMT: scope.symbols[length++] = decl.data.fun.name.str; break;
-            case STRUCT_STMT:   scope.symbols[length++] = decl.data.structdef.name.str; break;
-            case ENUM_STMT:     scope.symbols[length++] = decl.data.enumdef.name.str; break;
+            case DECL:          scope.symbols[length++] = decl.decl.name.str; break;
+            case TYPEDEF:       scope.symbols[length++] = decl.typedefdata.name.str; break;
+            case FUNCTION_STMT: scope.symbols[length++] = decl.fun.name.str; break;
+            case STRUCT_STMT:   scope.symbols[length++] = decl.structdef.name.str; break;
+            case ENUM_STMT:     scope.symbols[length++] = decl.enumdef.name.str; break;
 
             default: break;
         }
     }
 
-    for (size_t i = 0; i < stmt->data.block.len; i++) {
-        if (typecheck_stmt(&stmt->data.block.stmts[i], &scope)) {
+    for (size_t i = 0; i < stmt->block.len; i++) {
+        if (typecheck_stmt(&stmt->block.stmts[i], &scope)) {
             free_symbol_table(scope);
-            free_stmt_arrn_annots(stmt->data.block.stmts, i);
+            free_stmt_arrn_annots(stmt->block.stmts, i);
             return true;
         }
     }
@@ -159,7 +159,7 @@ bool typecheck_stmt(Stmt* stmt, SymbolTable* table) {
         case NOP:        return false;
         case BLOCK:      return typecheck_block(stmt, table);
         case EXPR_STMT:
-            Type type = typecheck_expr(&stmt->data.expr, table);
+            Type type = typecheck_expr(&stmt->expr, table);
             free_type(type);
             return type.type == ERROR_TYPE;
 
@@ -204,23 +204,23 @@ void free_type(Type type) {
 
         case ARR_TYPE:
         case PTR_TYPE:
-            free_type(*type.data.ptr.type);
-            free(type.data.ptr.type);
+            free_type(*type.ptr.type);
+            free(type.ptr.type);
             break;
         case FUN_TYPE:
-            free_type(*type.data.fun.ret);
-            free(type.data.fun.ret);
-            free_type_arrn(type.data.fun.paramt, type.data.fun.paramc);
+            free_type(*type.fun.ret);
+            free(type.fun.ret);
+            free_type_arrn(type.fun.paramt, type.fun.paramc);
             break;
         case STRUCT_TYPE:
-            free(type.data.structtype.paramv);
-            free_type_arrn(type.data.structtype.paramt, type.data.structtype.paramc);
+            free(type.structtype.paramv);
+            free_type_arrn(type.structtype.paramt, type.structtype.paramc);
             break;
-        case ENUM_TYPE:      free(type.data.enumtype.items); break;
+        case ENUM_TYPE:      free(type.enumtype.items); break;
         case ENUM_ITEM_TYPE: break;
         case TYPEDEF_TYPE:
-            free_type(*type.data.typedeftype.type);
-            free(type.data.typedeftype.type);
+            free_type(*type.typedeftype.type);
+            free(type.typedeftype.type);
             break;
     }
 }
@@ -243,7 +243,7 @@ void free_expr_annots(Expr expr) {
     switch (expr.type) {
         case ERROR_EXPR:   break;
         case NO_EXPR:      break;
-        case GROUPED_EXPR: free_expr_annots(*expr.data.group); break;
+        case GROUPED_EXPR: free_expr_annots(*expr.group); break;
         case ATOMIC_EXPR:  break;
         case ARR_EXPR:
         case LAMBDA_EXPR:
@@ -265,8 +265,8 @@ void free_stmt_annots(Stmt stmt) {
     switch (stmt.type) {
         case ERROR_STMT: break;
         case NOP:        break;
-        case BLOCK:      free_stmt_arrn_annots(stmt.data.block.stmts, stmt.data.block.len); break;
-        case EXPR_STMT:  free_expr_annots(stmt.data.expr); break;
+        case BLOCK:      free_stmt_arrn_annots(stmt.block.stmts, stmt.block.len); break;
+        case EXPR_STMT:  free_expr_annots(stmt.expr); break;
         case DECL:
         case TYPEDEF:
         case IFELSE_STMT:
@@ -310,94 +310,89 @@ Type clone_type(Type type) {
 
         case ARR_TYPE:
         case PTR_TYPE:
-            Type inner = clone_type(*type.data.ptr.type);
+            Type inner = clone_type(*type.ptr.type);
             if (inner.type == ERROR_TYPE) return inner;
-            clone.data.ptr.type = malloc(sizeof(Type));
-            if (clone.data.ptr.type == NULL) {
+            clone.ptr.type = malloc(sizeof(Type));
+            if (clone.ptr.type == NULL) {
                 malloc_error();
                 free_type(inner);
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
-            memcpy(clone.data.ptr.type, &inner, sizeof(Type));
+            memcpy(clone.ptr.type, &inner, sizeof(Type));
             return clone;
 
         case FUN_TYPE:
-            Type ret = clone_type(*type.data.fun.ret);
+            Type ret = clone_type(*type.fun.ret);
             if (ret.type == ERROR_TYPE) return ret;
-            clone.data.fun.ret = malloc(sizeof(Type));
-            clone.data.fun.paramt = malloc(sizeof(Type) * type.data.fun.paramc);
-            if (clone.data.fun.ret == NULL ||
-                (type.data.fun.paramc && clone.data.fun.paramt == NULL))
-            {
+            clone.fun.ret = malloc(sizeof(Type));
+            clone.fun.paramt = malloc(sizeof(Type) * type.fun.paramc);
+            if (clone.fun.ret == NULL || (type.fun.paramc && clone.fun.paramt == NULL)) {
                 malloc_error();
                 free_type(ret);
-                free(clone.data.fun.ret);
-                free(clone.data.fun.paramt);
+                free(clone.fun.ret);
+                free(clone.fun.paramt);
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
-            memcpy(clone.data.ptr.type, &inner, sizeof(Type));
-            for (size_t i = 0; i < type.data.fun.paramc; i++) {
-                Type param = clone_type(type.data.fun.paramt[i]);
+            memcpy(clone.ptr.type, &inner, sizeof(Type));
+            for (size_t i = 0; i < type.fun.paramc; i++) {
+                Type param = clone_type(type.fun.paramt[i]);
                 if (param.type == ERROR_TYPE) {
-                    free_type(*clone.data.fun.ret);
-                    free(clone.data.fun.ret);
-                    free_type_arrn(clone.data.fun.paramt, i);
+                    free_type(*clone.fun.ret);
+                    free(clone.fun.ret);
+                    free_type_arrn(clone.fun.paramt, i);
                     return param;
                 }
-                memcpy(&clone.data.fun.paramt[i], &param, sizeof(Type));
+                memcpy(&clone.fun.paramt[i], &param, sizeof(Type));
             }
             return clone;
 
         case STRUCT_TYPE:
-            clone.data.structtype.paramv = malloc(sizeof(char*) * type.data.structtype.paramc);
-            clone.data.structtype.paramt = malloc(sizeof(Type) * type.data.structtype.paramc);
-            if (type.data.structtype.paramc &&
-                (clone.data.structtype.paramt == NULL || clone.data.structtype.paramt == NULL))
+            clone.structtype.paramv = malloc(sizeof(char*) * type.structtype.paramc);
+            clone.structtype.paramt = malloc(sizeof(Type) * type.structtype.paramc);
+            if (type.structtype.paramc &&
+                (clone.structtype.paramt == NULL || clone.structtype.paramt == NULL))
             {
                 malloc_error();
-                free(clone.data.structtype.paramv);
-                free(clone.data.structtype.paramt);
+                free(clone.structtype.paramv);
+                free(clone.structtype.paramt);
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
             memcpy(
-                clone.data.structtype.paramv, type.data.structtype.paramv,
-                sizeof(Type) * type.data.structtype.paramc
+                clone.structtype.paramv, type.structtype.paramv,
+                sizeof(Type) * type.structtype.paramc
             );
-            for (size_t i = 0; i < type.data.structtype.paramc; i++) {
-                Type param = clone_type(type.data.structtype.paramt[i]);
+            for (size_t i = 0; i < type.structtype.paramc; i++) {
+                Type param = clone_type(type.structtype.paramt[i]);
                 if (param.type == ERROR_TYPE) {
-                    free(clone.data.structtype.paramv);
-                    free_type_arrn(clone.data.structtype.paramt, i);
+                    free(clone.structtype.paramv);
+                    free_type_arrn(clone.structtype.paramt, i);
                     return param;
                 }
-                memcpy(&clone.data.structtype.paramt[i], &param, sizeof(Type));
+                memcpy(&clone.structtype.paramt[i], &param, sizeof(Type));
             }
             return clone;
 
         case ENUM_TYPE:
-            clone.data.enumtype.items = malloc(sizeof(char*) * type.data.enumtype.len);
-            if (type.data.enumtype.len && clone.data.enumtype.items == NULL) {
+            clone.enumtype.items = malloc(sizeof(char*) * type.enumtype.len);
+            if (type.enumtype.len && clone.enumtype.items == NULL) {
                 malloc_error();
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
-            memcpy(
-                clone.data.enumtype.items, type.data.enumtype.items,
-                sizeof(char*) * type.data.enumtype.len
-            );
+            memcpy(clone.enumtype.items, type.enumtype.items, sizeof(char*) * type.enumtype.len);
             return clone;
 
         case ENUM_ITEM_TYPE: return clone;
 
         case TYPEDEF_TYPE:
-            Type value = clone_type(*type.data.typedeftype.type);
+            Type value = clone_type(*type.typedeftype.type);
             if (value.type == ERROR_TYPE) return value;
-            clone.data.typedeftype.type = malloc(sizeof(Type));
-            if (clone.data.typedeftype.type == NULL) {
+            clone.typedeftype.type = malloc(sizeof(Type));
+            if (clone.typedeftype.type == NULL) {
                 malloc_error();
                 free_type(value);
                 return (Type) { ERROR_TYPE, false, false, {} };
             }
-            memcpy(clone.data.typedeftype.type, &value, sizeof(Type));
+            memcpy(clone.typedeftype.type, &value, sizeof(Type));
             return clone;
     }
 

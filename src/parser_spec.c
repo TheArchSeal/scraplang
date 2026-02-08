@@ -3,50 +3,50 @@
 #include "parser_common.h"
 #include "printerr.h"
 
-TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base);
+Spec parse_spec_mod(const Token** it, Spec base);
 
-TypeSpec parse_type_spec_group(const Token** it) {
+Spec parse_spec_group(const Token** it) {
     // (
     Token start = *(*it)++;
 
     // inner type specifier
-    TypeSpec group = parse_type_spec(it);
+    Spec group = parse_spec(it);
     if (group.type == ERROR_SPEC) goto err;
 
     // )
     if (consume_expected_token(it, RPAREN)) goto err_free_group;
 
-    TypeSpec spec;
+    Spec spec;
     spec.type = GROUPED_SPEC;
     spec.line = start.line;
     spec.col = start.col;
 
     // allocations
-    spec.data.group = MALLOC_STRUCT(group);
-    if (spec.data.group == NULL) goto err_free_group;
+    spec.group = MALLOC_STRUCT(group);
+    if (spec.group == NULL) goto err_free_group;
 
     return spec;
 err_free_group:
     free_spec(group);
 err:
-    return (TypeSpec) { .type = ERROR_SPEC };
+    return (Spec) { .type = ERROR_SPEC };
 }
 
-TypeSpec parse_fun_spec(const Token** it) {
+Spec parse_fun_spec(const Token** it) {
     // (a, b?) => c
 
-    TypeSpec item;
+    Spec item;
 
     // (
     Token start = *(*it)++;
-    DynArr array = dynarr_create(sizeof(TypeSpec));
+    DynArr array = dynarr_create(sizeof(Spec));
 
     // number of optional parameters
     size_t optional = 0;
     if ((*it)->type != RPAREN) {
         for (;;) {
             // next parameter type
-            item = parse_type_spec(it);
+            item = parse_spec(it);
             if (item.type == ERROR_SPEC) goto err_free_arr;
 
             if (dynarr_append(&array, &item)) goto err_free_item;
@@ -78,20 +78,20 @@ TypeSpec parse_fun_spec(const Token** it) {
     if (consume_expected_token(it, DARROW)) goto err_free_arr;
 
     // return type
-    TypeSpec ret = parse_type_spec(it);
+    Spec ret = parse_spec(it);
     if (ret.type == ERROR_SPEC) goto err_free_arr;
 
-    TypeSpec spec;
+    Spec spec;
     spec.type = FUN_SPEC;
     spec.line = start.line;
     spec.col = start.col;
-    spec.data.fun.paramc = array.length;
-    spec.data.fun.optc = optional;
-    spec.data.fun.paramt = array.c_arr;
+    spec.fun.paramc = array.length;
+    spec.fun.optc = optional;
+    spec.fun.paramt = array.c_arr;
 
     // allocations
-    spec.data.fun.ret = MALLOC_STRUCT(ret);
-    if (spec.data.fun.ret == NULL) goto err_free_ret;
+    spec.fun.ret = MALLOC_STRUCT(ret);
+    if (spec.fun.ret == NULL) goto err_free_ret;
 
     return spec;
 err_free_item:
@@ -101,10 +101,10 @@ err_free_ret:
     free_spec(ret);
 err_free_arr:
     free_spec_dynarr(&array);
-    return (TypeSpec) { .type = ERROR_SPEC };
+    return (Spec) { .type = ERROR_SPEC };
 }
 
-TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, TypeSpec base) {
+Spec handle_spec_mod(SpecEnum type, bool mut, const Token** it, Spec base) {
     // * or [
     Token start = *(*it)++;
 
@@ -113,48 +113,48 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
         if (consume_expected_token(it, RBRACKET)) goto err;
     }
 
-    TypeSpec spec;
+    Spec spec;
     spec.type = type;
     spec.line = base.line;
     spec.col = base.col;
-    spec.data.ptr.mutable = mut;
+    spec.ptr.mutable = mut;
 
     // allocations
-    spec.data.ptr.spec = MALLOC_STRUCT(base);
-    if (spec.data.ptr.spec == NULL) goto err;
+    spec.ptr.spec = MALLOC_STRUCT(base);
+    if (spec.ptr.spec == NULL) goto err;
 
     // may have another modification
-    TypeSpec next = parse_type_spec_mod(it, spec);
+    Spec next = parse_spec_mod(it, spec);
     if (next.type == ERROR_SPEC) goto err_free_alloc;
 
     return next;
 err_free_alloc:
-    free(spec.data.ptr.spec);
+    free(spec.ptr.spec);
 err:
-    return (TypeSpec) { .type = ERROR_SPEC };
+    return (Spec) { .type = ERROR_SPEC };
 }
 
-TypeSpec parse_type_spec_mod(const Token** it, TypeSpec base) {
+Spec parse_spec_mod(const Token** it, Spec base) {
     switch ((*it)->type) {
         // regular modifier
-        case LBRACKET: return handle_type_spec_mod(ARR_SPEC, true, it, base);
-        case STAR:     return handle_type_spec_mod(PTR_SPEC, true, it, base);
+        case LBRACKET: return handle_spec_mod(ARR_SPEC, true, it, base);
+        case STAR:     return handle_spec_mod(PTR_SPEC, true, it, base);
 
         case CONST_TOKEN:  // const modifier
             (*it)++;
             switch ((*it)->type) {
-                case LBRACKET: return handle_type_spec_mod(ARR_SPEC, false, it, base);
-                case STAR:     return handle_type_spec_mod(PTR_SPEC, false, it, base);
-                default:       unexpected_token(**it); return (TypeSpec) { .type = ERROR_SPEC };
+                case LBRACKET: return handle_spec_mod(ARR_SPEC, false, it, base);
+                case STAR:     return handle_spec_mod(PTR_SPEC, false, it, base);
+                default:       unexpected_token(**it); return (Spec) { .type = ERROR_SPEC };
             }
 
         default: return base;  // no modifier
     }
 }
 
-TypeSpec parse_type_spec(const Token** it) {
-    TypeSpec spec;
-    TypeSpec next;
+Spec parse_spec(const Token** it) {
+    Spec spec;
+    Spec next;
 
     switch ((*it)->type) {
         // atomic types
@@ -168,19 +168,19 @@ TypeSpec parse_type_spec(const Token** it) {
         case U16_TOKEN:
         case U32_TOKEN:
         case U64_TOKEN:
-        case VAR_NAME:
+        case IDENTIFIER:
             Token token = *(*it)++;
             spec.type = ATOMIC_SPEC;
             spec.line = token.line;
             spec.col = token.col;
-            spec.data.atom = token;
-            return parse_type_spec_mod(it, spec);
+            spec.atom = token;
+            return parse_spec_mod(it, spec);
 
         case LPAREN:
             // check if function type specifier
-            spec = is_lambda(it) ? parse_fun_spec(it) : parse_type_spec_group(it);
+            spec = is_lambda(it) ? parse_fun_spec(it) : parse_spec_group(it);
             // modifications
-            next = parse_type_spec_mod(it, spec);
+            next = parse_spec_mod(it, spec);
             if (next.type == ERROR_SPEC) goto err_free_spec;
             break;
 
@@ -191,5 +191,5 @@ TypeSpec parse_type_spec(const Token** it) {
 err_free_spec:
     free_spec(spec);
 err:
-    return (TypeSpec) { .type = ERROR_SPEC };
+    return (Spec) { .type = ERROR_SPEC };
 }

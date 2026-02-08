@@ -29,16 +29,16 @@ int main(int argc, char** argv) {
     //     printf("(%d)\t%s", it->type, it->str);
     //     switch (it->type) {
     //         case INT_LITERAL:
-    //             printf("\t%" PRIliteral "\n", it->data.int_literal);
+    //             printf("\t%" PRIliteral "\n", it->int_literal);
     //             break;
     //         case CHR_LITERAL:
-    //             printf("\t%c\n", it->data.chr_literal);
+    //             printf("\t%c\n", it->chr_literal);
     //             break;
     //         case STR_LITERAL:
-    //             printf("\t%s\n", it->data.str_literal);
+    //             printf("\t%s\n", it->str_literal);
     //             break;
     //         case VAR_NAME:
-    //             printf("\t%s\n", it->data.var_name);
+    //             printf("\t%s\n", it->var_name);
     //             break;
     //         default:
     //             printf("\n");

@@ -109,8 +109,8 @@ Expr parse_expr_group(const Token** it) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.group = MALLOC_STRUCT(group);
-    if (expr.data.group == NULL) goto err_free_group;
+    expr.group = MALLOC_STRUCT(group);
+    if (expr.group == NULL) goto err_free_group;
 
     return expr;
 err_free_group:
@@ -132,14 +132,14 @@ Expr parse_array_literal(const Token** it) {
     expr.annotation = NULL;
 
     // items
-    if (parse_args(it, &expr.data.arr.len, &expr.data.arr.items)) goto err;
+    if (parse_args(it, &expr.arr.len, &expr.arr.items)) goto err;
 
     // ]
     if (consume_expected_token(it, RBRACKET)) goto err_free_args;
 
     return expr;
 err_free_args:
-    free_expr_arrn(expr.data.arr.items, expr.data.arr.len);
+    free_expr_arrn(expr.arr.items, expr.arr.len);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -158,8 +158,8 @@ Expr parse_lambda(const Token** it) {
 
     // parameters
     if (parse_params(
-            it, &expr.data.lambda.paramc, &expr.data.lambda.optc, &expr.data.lambda.paramv,
-            &expr.data.lambda.paramt, &expr.data.lambda.paramd
+            it, &expr.lambda.paramc, &expr.lambda.optc, &expr.lambda.paramv, &expr.lambda.paramt,
+            &expr.lambda.paramd
         ))
     {
         goto err;
@@ -175,16 +175,16 @@ Expr parse_lambda(const Token** it) {
     if (body.type == ERROR_EXPR) goto err_free_params;
 
     // allocations
-    expr.data.lambda.expr = MALLOC_STRUCT(body);
-    if (expr.data.lambda.expr == NULL) goto err_free_body;
+    expr.lambda.expr = MALLOC_STRUCT(body);
+    if (expr.lambda.expr == NULL) goto err_free_body;
 
     return expr;
 err_free_body:
     free_expr(body);
 err_free_params:
-    free(expr.data.lambda.paramv);
-    free_spec_arrn(expr.data.lambda.paramt, expr.data.lambda.paramc);
-    free_expr_arrn(expr.data.lambda.paramd, expr.data.lambda.paramc);
+    free(expr.lambda.paramv);
+    free_spec_arrn(expr.lambda.paramt, expr.lambda.paramc);
+    free_expr_arrn(expr.lambda.paramd, expr.lambda.paramc);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -209,9 +209,9 @@ Expr parse_subscript(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.subscript.arr = MALLOC_STRUCT(term);
-    expr.data.subscript.idx = MALLOC_STRUCT(idx);
-    if (expr.data.subscript.arr == NULL || expr.data.subscript.idx == NULL) goto err_free_allocs;
+    expr.subscript.arr = MALLOC_STRUCT(term);
+    expr.subscript.idx = MALLOC_STRUCT(idx);
+    if (expr.subscript.arr == NULL || expr.subscript.idx == NULL) goto err_free_allocs;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
@@ -219,8 +219,8 @@ Expr parse_subscript(const Token** it, Expr term) {
 
     return next;
 err_free_allocs:
-    free(expr.data.subscript.arr);
-    free(expr.data.subscript.idx);
+    free(expr.subscript.arr);
+    free(expr.subscript.idx);
 err_free_idx:
     free_expr(idx);
 err:
@@ -240,14 +240,14 @@ Expr parse_call(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // arguments
-    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) goto err;
+    if (parse_args(it, &expr.call.argc, &expr.call.argv)) goto err;
 
     // )
     if (consume_expected_token(it, RPAREN)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = MALLOC_STRUCT(term);
-    if (expr.data.call.fun == NULL) goto err_free_args;
+    expr.call.fun = MALLOC_STRUCT(term);
+    if (expr.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
@@ -255,9 +255,9 @@ Expr parse_call(const Token** it, Expr term) {
 
     return next;
 err_free_alloc:
-    free(expr.data.call.fun);
+    free(expr.call.fun);
 err_free_args:
-    free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+    free_expr_arrn(expr.call.argv, expr.call.argc);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -275,14 +275,14 @@ Expr parse_constructor(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // arguments
-    if (parse_args(it, &expr.data.call.argc, &expr.data.call.argv)) goto err;
+    if (parse_args(it, &expr.call.argc, &expr.call.argv)) goto err;
 
     // }
     if (consume_expected_token(it, RBRACE)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = MALLOC_STRUCT(term);
-    if (expr.data.call.fun == NULL) goto err_free_args;
+    expr.call.fun = MALLOC_STRUCT(term);
+    if (expr.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
@@ -290,9 +290,9 @@ Expr parse_constructor(const Token** it, Expr term) {
 
     return next;
 err_free_expr_alloc:
-    free(expr.data.call.fun);
+    free(expr.call.fun);
 err_free_args:
-    free_expr_arrn(expr.data.call.argv, expr.data.call.argc);
+    free_expr_arrn(expr.call.argv, expr.call.argc);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -305,18 +305,18 @@ Expr parse_access(const Token** it, Expr term) {
 
     // variable name
     Token member = **it;
-    if (consume_expected_token(it, VAR_NAME)) goto err;
+    if (consume_expected_token(it, IDENTIFIER)) goto err;
 
     Expr expr;
     expr.type = ACCESS_EXPR;
     expr.line = term.line;
     expr.col = term.col;
     expr.annotation = NULL;
-    expr.data.access.memeber = member;
+    expr.access.memeber = member;
 
     // allocations
-    expr.data.access.obj = MALLOC_STRUCT(term);
-    if (expr.data.access.obj == NULL) goto err;
+    expr.access.obj = MALLOC_STRUCT(term);
+    if (expr.access.obj == NULL) goto err;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
@@ -324,7 +324,7 @@ Expr parse_access(const Token** it, Expr term) {
 
     return next;
 err_free_alloc:
-    free(expr.data.access.obj);
+    free(expr.access.obj);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -338,12 +338,12 @@ Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
     expr.line = term.line;
     expr.col = term.col;
     expr.annotation = NULL;
-    expr.data.op.type = type;
-    expr.data.op.token = token;
+    expr.op.type = type;
+    expr.op.token = token;
 
     // allocations
-    expr.data.op.first = MALLOC_STRUCT(term);
-    if (expr.data.op.first == NULL) goto err;
+    expr.op.first = MALLOC_STRUCT(term);
+    if (expr.op.first == NULL) goto err;
 
     // may have another postfix operator
     Expr next = parse_postfix(it, expr);
@@ -351,7 +351,7 @@ Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
 
     return next;
 err_free_alloc:
-    free(expr.data.op.first);
+    free(expr.op.first);
 err:
     return (Expr) { .type = ERROR_EXPR };
 }
@@ -369,12 +369,12 @@ Expr parse_unary_prefix(OpEnum type, const Token** it) {
     expr.line = token.line;
     expr.col = token.col;
     expr.annotation = NULL;
-    expr.data.op.type = type;
-    expr.data.op.token = token;
+    expr.op.type = type;
+    expr.op.token = token;
 
     // allocations
-    expr.data.op.first = MALLOC_STRUCT(term);
-    if (expr.data.op.first == NULL) goto err_free_term;
+    expr.op.first = MALLOC_STRUCT(term);
+    if (expr.op.first == NULL) goto err_free_term;
 
     return expr;
 err_free_term:
@@ -392,7 +392,7 @@ Expr parse_atomic_term(const Token** it) {
     expr.line = token.line;
     expr.col = token.col;
     expr.annotation = NULL;
-    expr.data.atom = token;
+    expr.atom = token;
 
     return parse_postfix(it, expr);
 }
@@ -420,7 +420,7 @@ Expr parse_term(const Token** it) {
         case INT_LITERAL:
         case CHR_LITERAL:
         case STR_LITERAL:
-        case VAR_NAME:    return parse_atomic_term(it);
+        case IDENTIFIER:  return parse_atomic_term(it);
 
         case PLUS:     return parse_unary_prefix(UNARY_PLUS, it);
         case DPLUS:    return parse_unary_prefix(POSTFIX_INC, it);
@@ -493,19 +493,19 @@ Expr parse_expr(const Token** it, size_t precedence) {
         expr.line = lhs.line;
         expr.col = lhs.col;
         expr.annotation = NULL;
-        expr.data.op.type = op;
-        expr.data.op.token = token;
+        expr.op.type = op;
+        expr.op.token = token;
 
         // allocations
-        expr.data.op.first = MALLOC_STRUCT(lhs);
-        expr.data.op.second = MALLOC_STRUCT(rhs);
-        if (expr.data.op.first == NULL || expr.data.op.second == NULL) goto err_free_allocs;
+        expr.op.first = MALLOC_STRUCT(lhs);
+        expr.op.second = MALLOC_STRUCT(rhs);
+        if (expr.op.first == NULL || expr.op.second == NULL) goto err_free_allocs;
 
         // rightmost operand is third and middle is second if ternary
         if (ternary) {
-            expr.data.op.third = expr.data.op.second;
-            expr.data.op.second = MALLOC_STRUCT(middle);
-            if (expr.data.op.second == NULL) goto err_free_ternary_alloc;
+            expr.op.third = expr.op.second;
+            expr.op.second = MALLOC_STRUCT(middle);
+            if (expr.op.second == NULL) goto err_free_ternary_alloc;
         }
 
         // right-to-left will be done here but left-to-right must loop
@@ -518,10 +518,10 @@ Expr parse_expr(const Token** it, size_t precedence) {
     }
 
 err_free_ternary_alloc:
-    free(expr.data.op.third);
+    free(expr.op.third);
 err_free_allocs:
-    free(expr.data.op.second);
-    free(expr.data.op.first);
+    free(expr.op.second);
+    free(expr.op.first);
     free_expr(rhs);
 err_free_middle:
     if (ternary) free_expr(middle);

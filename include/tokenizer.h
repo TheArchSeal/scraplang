@@ -16,7 +16,7 @@ enum TokenEnum {
     INT_LITERAL,
     CHR_LITERAL,
     STR_LITERAL,
-    VAR_NAME,
+    IDENTIFIER,
 
     LPAREN,    // (
     RPAREN,    // )
@@ -106,21 +106,19 @@ enum TokenEnum {
     U64_TOKEN,
 };
 
-union TokenData {
-    literal_t int_literal;
-    char chr_literal;
-    char* str_literal;
-    char* var_name;
-};
-
 typedef enum TokenEnum TokenEnum;
-typedef union TokenData TokenData;
 
 struct Token {
     TokenEnum type;
     char* str;
     size_t line, col;
-    TokenData data;
+
+    union {
+        literal_t int_literal;
+        char chr_literal;
+        char* str_literal;
+        char* identifier;
+    };
 };
 
 Token* tokenize(const char* program, size_t tabsize);

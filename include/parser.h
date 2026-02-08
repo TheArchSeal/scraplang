@@ -7,12 +7,12 @@
 struct Type;
 typedef struct Type Type;
 
-typedef struct TypeSpec TypeSpec;
+typedef struct Spec Spec;
 typedef struct Expr Expr;
 typedef struct Stmt Stmt;
 typedef Stmt AST;
 
-enum TypeSpecEnum {
+enum SpecEnum {
     ERROR_SPEC,
     INFERRED_SPEC,
 
@@ -23,34 +23,32 @@ enum TypeSpecEnum {
     FUN_SPEC,
 };
 
-struct PtrTypeSpecData {
-    TypeSpec* spec;
+struct PtrSpecData {
+    Spec* spec;
     bool mutable;
 };
 
-struct FunTypeSpecData {
+struct FunSpecData {
     size_t paramc, optc;
-    TypeSpec* paramt;
-    TypeSpec* ret;
+    Spec* paramt;
+    Spec* ret;
 };
 
-typedef struct PtrTypeSpecData PtrTypeSpecData;
-typedef struct FunTypeSpecData FunTypeSpecData;
+typedef struct PtrSpecData PtrSpecData;
+typedef struct FunSpecData FunSpecData;
 
-union TypeSpecData {
-    TypeSpec* group;
-    Token atom;
-    PtrTypeSpecData ptr;
-    FunTypeSpecData fun;
-};
+typedef enum SpecEnum SpecEnum;
 
-typedef enum TypeSpecEnum TypeSpecEnum;
-typedef union TypeSpecData TypeSpecData;
-
-struct TypeSpec {
-    TypeSpecEnum type;
+struct Spec {
+    SpecEnum type;
     size_t line, col;
-    TypeSpecData data;
+
+    union {
+        Spec* group;
+        Token atom;
+        PtrSpecData ptr;
+        FunSpecData fun;
+    };
 };
 
 enum ExprEnum {
@@ -122,7 +120,7 @@ struct ArrExprData {
 struct LambdaExprData {
     size_t paramc, optc;
     Token* paramv;
-    TypeSpec* paramt;
+    Spec* paramt;
     Expr* paramd;
     Expr* expr;
 };
@@ -161,24 +159,22 @@ typedef struct CallData CallData;
 typedef struct ConstructorData ConstructorData;
 typedef struct AccessData AccessData;
 
-union ExprData {
-    Expr* group;
-    Token atom;
-    ArrExprData arr;
-    LambdaExprData lambda;
-    OpExprData op;
-    SubscriptData subscript;
-    CallData call;
-    AccessData access;
-};
-
 typedef enum ExprEnum ExprEnum;
-typedef union ExprData ExprData;
 
 struct Expr {
     ExprEnum type;
     size_t line, col;
-    ExprData data;
+
+    union {
+        Expr* group;
+        Token atom;
+        ArrExprData arr;
+        LambdaExprData lambda;
+        OpExprData op;
+        SubscriptData subscript;
+        CallData call;
+        AccessData access;
+    };
 
     Type* annotation;
 };
@@ -215,13 +211,13 @@ struct BlockStmtData {
 struct DeclData {
     Token name;
     Expr val;
-    TypeSpec spec;
+    Spec spec;
     bool mutable;
 };
 
 struct TypedefData {
     Token name;
-    TypeSpec val;
+    Spec val;
 };
 
 struct IfElseData {
@@ -254,9 +250,9 @@ struct FunData {
     Token name;
     size_t paramc, optc;
     Token* paramv;
-    TypeSpec* paramt;
+    Spec* paramt;
     Expr* paramd;
-    TypeSpec ret;
+    Spec ret;
     Stmt* body;
 };
 
@@ -264,7 +260,7 @@ struct StructData {
     Token name;
     size_t paramc, optc;
     Token* paramv;
-    TypeSpec* paramt;
+    Spec* paramt;
     Expr* paramd;
 };
 
@@ -285,27 +281,25 @@ typedef struct FunData FunData;
 typedef struct StructData StructData;
 typedef struct EnumData EnumData;
 
-union StmtData {
-    BlockStmtData block;
-    Expr expr;
-    DeclData decl;
-    TypedefData type;
-    IfElseData ifelse;
-    SwitchData switchcase;
-    WhileData whileloop;
-    ForData forloop;
-    FunData fun;
-    StructData structdef;
-    EnumData enumdef;
-};
-
 typedef enum StmtEnum StmtEnum;
-typedef union StmtData StmtData;
 
 struct Stmt {
     StmtEnum type;
     size_t line, col;
-    StmtData data;
+
+    union {
+        BlockStmtData block;
+        Expr expr;
+        DeclData decl;
+        TypedefData typedefdata;
+        IfElseData ifelse;
+        SwitchData switchcase;
+        WhileData whileloop;
+        ForData forloop;
+        FunData fun;
+        StructData structdef;
+        EnumData enumdef;
+    };
 };
 
 AST* parse(const Token* program);
