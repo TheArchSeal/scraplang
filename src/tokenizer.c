@@ -196,7 +196,7 @@ bool parse_str(char** dst, size_t* dst_len, const char* src, size_t src_len) {
     char* str = malloc(src_len);
     if (str == NULL) {
         malloc_error();
-        return false;
+        return true;
     }
 
     size_t i = 0;
@@ -323,6 +323,7 @@ Token* tokenize(const char* program, size_t tabsize) {
     size_t tokenlen = 0;
     TokenEnum tokentype = ERROR_TOKEN;
     size_t tokenline = line, tokencol = col;
+    char* tokenstr;
 
     char chr;
     do {
@@ -386,8 +387,7 @@ Token* tokenize(const char* program, size_t tabsize) {
                                 "missing terminating %c character in %s literal %.*s\n", quote,
                                 literal_name(quote), tokenlen, tokenpos
                             );
-                            free_token_dynarr(&array);
-                            return NULL;
+                            goto err_free_arr;
                         }
                     } while (chr != quote || escaping);
 
@@ -425,47 +425,30 @@ Token* tokenize(const char* program, size_t tabsize) {
                 // check that token is valid
                 if (tokentype == ERROR_TOKEN) {
                     syntax_error("invalid token '%.*s'\n", tokenlen, tokenpos);
-                    free_token_dynarr(&array);
-                    return NULL;
+                    goto err_free_arr;
                 }
 
                 // copy token to new string
-                char* str = malloc(tokenlen + 1);
-                if (str == NULL) {
-                    malloc_error();
-                    free_token_dynarr(&array);
-                    return NULL;
-                }
-                strncpy(str, tokenpos, tokenlen);
-                str[tokenlen] = '\0';
+                tokenstr = strndup(tokenpos, tokenlen);
+                if (tokenstr == NULL) goto err_free_arr;
 
                 // add necessary data based on type
                 TokenData data = {};
                 switch (tokentype) {
                     case INT_LITERAL:
-                        if (parse_int(&data.int_literal, str)) {
-                            free_token_dynarr(&array);
-                            free(str);
-                            return NULL;
-                        }
+                        if (parse_int(&data.int_literal, tokenstr)) goto err_free_tokenstr;
                         break;
                     case CHR_LITERAL:
-                        if (parse_chr(&data.chr_literal, str, tokenlen)) {
-                            free_token_dynarr(&array);
-                            free(str);
-                            return NULL;
-                        }
+                        if (parse_chr(&data.chr_literal, tokenstr, tokenlen))
+                            goto err_free_tokenstr;
                         break;
                     case STR_LITERAL:
-                        if (parse_str(&data.str_literal, NULL, str, tokenlen)) {
-                            free_token_dynarr(&array);
-                            free(str);
-                            return NULL;
-                        }
+                        if (parse_str(&data.str_literal, NULL, tokenstr, tokenlen))
+                            goto err_free_tokenstr;
                         break;
                     case VAR_NAME:
                         // variable name is same as token string
-                        data.var_name = str;
+                        data.var_name = tokenstr;
                         break;
 
                     default: break;
@@ -474,16 +457,12 @@ Token* tokenize(const char* program, size_t tabsize) {
                 // push token
                 Token token = {
                     .type = tokentype,
-                    .str = str,
+                    .str = tokenstr,
                     .line = tokenline,
                     .col = tokencol,
                     .data = data,
                 };
-                if (dynarr_append(&array, &token)) {
-                    malloc_error();
-                    dynarr_destroy(&array);
-                    return NULL;
-                }
+                if (dynarr_append(&array, &token)) goto err_free_tokenstr;
 
                 // clear token
                 tokentype = ERROR_TOKEN;
@@ -505,13 +484,14 @@ Token* tokenize(const char* program, size_t tabsize) {
         .line = line,
         .col = col,
     };
-    if (dynarr_append(&array, &eof)) {
-        malloc_error();
-        dynarr_destroy(&array);
-        return NULL;
-    }
+    if (dynarr_append(&array, &eof)) goto err_free_arr;
 
     return array.c_arr;
+err_free_tokenstr:
+    free(tokenstr);
+err_free_arr:
+    dynarr_destroy(&array);
+    return NULL;
 }
 
 // Free all data inside token.

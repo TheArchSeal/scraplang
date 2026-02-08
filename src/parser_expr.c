@@ -109,7 +109,7 @@ Expr parse_expr_group(const Token** it) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.group = malloc_struct(&group, sizeof(Expr));
+    expr.data.group = MALLOC_STRUCT(group);
     if (expr.data.group == NULL) goto err_free_group;
 
     return expr;
@@ -175,7 +175,7 @@ Expr parse_lambda(const Token** it) {
     if (body.type == ERROR_EXPR) goto err_free_params;
 
     // allocations
-    expr.data.lambda.expr = malloc_struct(&body, sizeof(Expr));
+    expr.data.lambda.expr = MALLOC_STRUCT(body);
     if (expr.data.lambda.expr == NULL) goto err_free_body;
 
     return expr;
@@ -209,8 +209,8 @@ Expr parse_subscript(const Token** it, Expr term) {
     expr.annotation = NULL;
 
     // allocations
-    expr.data.subscript.arr = malloc_struct(&term, sizeof(Expr));
-    expr.data.subscript.idx = malloc_struct(&idx, sizeof(Expr));
+    expr.data.subscript.arr = MALLOC_STRUCT(term);
+    expr.data.subscript.idx = MALLOC_STRUCT(idx);
     if (expr.data.subscript.arr == NULL || expr.data.subscript.idx == NULL) goto err_free_allocs;
 
     // may have another postfix operator
@@ -246,7 +246,7 @@ Expr parse_call(const Token** it, Expr term) {
     if (consume_expected_token(it, RPAREN)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = malloc_struct(&term, sizeof(Expr));
+    expr.data.call.fun = MALLOC_STRUCT(term);
     if (expr.data.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
@@ -281,7 +281,7 @@ Expr parse_constructor(const Token** it, Expr term) {
     if (consume_expected_token(it, RBRACE)) goto err_free_args;
 
     // allocations
-    expr.data.call.fun = malloc_struct(&term, sizeof(Expr));
+    expr.data.call.fun = MALLOC_STRUCT(term);
     if (expr.data.call.fun == NULL) goto err_free_args;
 
     // may have another postfix operator
@@ -315,7 +315,7 @@ Expr parse_access(const Token** it, Expr term) {
     expr.data.access.memeber = member;
 
     // allocations
-    expr.data.access.obj = malloc_struct(&term, sizeof(Expr));
+    expr.data.access.obj = MALLOC_STRUCT(term);
     if (expr.data.access.obj == NULL) goto err;
 
     // may have another postfix operator
@@ -342,7 +342,7 @@ Expr parse_unary_postfix(OpEnum type, const Token** it, Expr term) {
     expr.data.op.token = token;
 
     // allocations
-    expr.data.op.first = malloc_struct(&term, sizeof(Expr));
+    expr.data.op.first = MALLOC_STRUCT(term);
     if (expr.data.op.first == NULL) goto err;
 
     // may have another postfix operator
@@ -373,7 +373,7 @@ Expr parse_unary_prefix(OpEnum type, const Token** it) {
     expr.data.op.token = token;
 
     // allocations
-    expr.data.op.first = malloc_struct(&term, sizeof(Expr));
+    expr.data.op.first = MALLOC_STRUCT(term);
     if (expr.data.op.first == NULL) goto err_free_term;
 
     return expr;
@@ -497,14 +497,14 @@ Expr parse_expr(const Token** it, size_t precedence) {
         expr.data.op.token = token;
 
         // allocations
-        expr.data.op.first = malloc_struct(&lhs, sizeof(Expr));
-        expr.data.op.second = malloc_struct(&rhs, sizeof(Expr));
+        expr.data.op.first = MALLOC_STRUCT(lhs);
+        expr.data.op.second = MALLOC_STRUCT(rhs);
         if (expr.data.op.first == NULL || expr.data.op.second == NULL) goto err_free_allocs;
 
         // rightmost operand is third and middle is second if ternary
         if (ternary) {
             expr.data.op.third = expr.data.op.second;
-            expr.data.op.second = malloc_struct(&middle, sizeof(Expr));
+            expr.data.op.second = MALLOC_STRUCT(middle);
             if (expr.data.op.second == NULL) goto err_free_ternary_alloc;
         }
 

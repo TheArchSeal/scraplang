@@ -22,7 +22,7 @@ TypeSpec parse_type_spec_group(const Token** it) {
     spec.col = start.col;
 
     // allocations
-    spec.data.group = malloc_struct(&group, sizeof(TypeSpec));
+    spec.data.group = MALLOC_STRUCT(group);
     if (spec.data.group == NULL) goto err_free_group;
 
     return spec;
@@ -90,7 +90,7 @@ TypeSpec parse_fun_spec(const Token** it) {
     spec.data.fun.paramt = array.c_arr;
 
     // allocations
-    spec.data.fun.ret = malloc_struct(&ret, sizeof(TypeSpec));
+    spec.data.fun.ret = MALLOC_STRUCT(ret);
     if (spec.data.fun.ret == NULL) goto err_free_ret;
 
     return spec;
@@ -120,7 +120,7 @@ TypeSpec handle_type_spec_mod(TypeSpecEnum type, bool mut, const Token** it, Typ
     spec.data.ptr.mutable = mut;
 
     // allocations
-    spec.data.ptr.spec = malloc_struct(&base, sizeof(TypeSpec));
+    spec.data.ptr.spec = MALLOC_STRUCT(base);
     if (spec.data.ptr.spec == NULL) goto err;
 
     // may have another modification

@@ -5,6 +5,17 @@
 
 #include "printerr.h"
 
+char* strndup(const char* str, size_t n) {
+    char* ptr = malloc(n + 1);
+    if (ptr == NULL) {
+        malloc_error();
+        return NULL;
+    }
+    strncpy(ptr, str, n);
+    ptr[n] = '\0';
+    return ptr;
+}
+
 void* malloc_struct(void* elem, size_t size) {
     void* ptr = malloc(size);
     if (ptr == NULL) {

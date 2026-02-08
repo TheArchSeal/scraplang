@@ -222,7 +222,7 @@ AST* parse(const Token* program) {
 
     if (consume_expected_token(it, EOF_TOKEN)) goto err_free_stmt;
 
-    Stmt* ast = malloc_struct(&stmt, sizeof(Stmt));
+    Stmt* ast = MALLOC_STRUCT(stmt);
     if (ast == NULL) goto err_free_stmt;
 
     return ast;

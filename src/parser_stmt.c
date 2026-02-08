@@ -149,12 +149,12 @@ Stmt parse_ifelse(const Token** it) {
         if (on_false.type == ERROR_STMT) goto err_free_true;
 
         // allocations
-        stmt.data.ifelse.on_false = malloc_struct(&on_false, sizeof(Stmt));
+        stmt.data.ifelse.on_false = MALLOC_STRUCT(on_false);
         if (stmt.data.ifelse.on_false == NULL) goto err_free_false;
     }
 
     // allocations
-    stmt.data.ifelse.on_true = malloc_struct(&on_true, sizeof(Stmt));
+    stmt.data.ifelse.on_true = MALLOC_STRUCT(on_true);
     if (stmt.data.ifelse.on_true == NULL) goto err_free_false_alloc;
 
     return stmt;
@@ -290,7 +290,7 @@ Stmt parse_while(const Token** it) {
     stmt.data.whileloop.condition = condition;
 
     // allocations
-    stmt.data.whileloop.body = malloc_struct(&body, sizeof(Stmt));
+    stmt.data.whileloop.body = MALLOC_STRUCT(body);
     if (stmt.data.whileloop.body == NULL) goto err_free_body;
 
     return stmt;
@@ -333,7 +333,7 @@ Stmt parse_dowhile(const Token** it) {
     stmt.data.whileloop.condition = condition;
 
     // allocations
-    stmt.data.whileloop.body = malloc_struct(&body, sizeof(Stmt));
+    stmt.data.whileloop.body = MALLOC_STRUCT(body);
     if (stmt.data.whileloop.body == NULL) goto err_free_cond;
 
     return stmt;
@@ -402,8 +402,8 @@ Stmt parse_for(const Token** it) {
     stmt.data.forloop.expr = expr;
 
     // allocations
-    stmt.data.forloop.init = malloc_struct(&init, sizeof(Stmt));
-    stmt.data.forloop.body = malloc_struct(&body, sizeof(Stmt));
+    stmt.data.forloop.init = MALLOC_STRUCT(init);
+    stmt.data.forloop.body = MALLOC_STRUCT(body);
     if (stmt.data.forloop.init == NULL || stmt.data.forloop.body == NULL) goto err_free_allocs;
 
     return stmt;
@@ -469,7 +469,7 @@ Stmt parse_function(const Token** it) {
     if (consume_expected_token(it, RBRACE)) goto err_free_body;
 
     // allocations
-    stmt.data.fun.body = malloc_struct(&body, sizeof(Stmt));
+    stmt.data.fun.body = MALLOC_STRUCT(body);
     if (stmt.data.fun.body == NULL) goto err_free_body;
 
     return stmt;
