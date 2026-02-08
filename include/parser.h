@@ -4,8 +4,7 @@
 
 #include "tokenizer.h"
 
-struct Type;
-typedef struct Type Type;
+typedef struct Annot Annot;
 
 typedef struct Spec Spec;
 typedef struct Expr Expr;
@@ -176,7 +175,7 @@ struct Expr {
         AccessData access;
     };
 
-    Type* annotation;
+    Annot* annotation;
 };
 
 enum StmtEnum {

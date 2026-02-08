@@ -2,93 +2,60 @@
 
 #include "parser.h"
 
-enum TypeEnum {
-    ERROR_TYPE,
-    UNDEFINED_TYPE,
+typedef struct Symbol Symbol;
+typedef struct SymbolTable SymbolTable;
 
-    VOID_TYPE,
-    BOOL_TYPE,
-    I8_TYPE,
-    I16_TYPE,
-    I32_TYPE,
-    I64_TYPE,
-    U8_TYPE,
-    U16_TYPE,
-    U32_TYPE,
-    U64_TYPE,
+enum AnnotEnum {
+    ERROR_ANNOT,
+    UNDEFINED_ANNOT,
 
-    ARR_TYPE,
-    PTR_TYPE,
-    FUN_TYPE,
-    STRUCT_TYPE,
-    ENUM_TYPE,
-    ENUM_ITEM_TYPE,
-    TYPEDEF_TYPE,
+    VOID_ANNOT,
+    BOOL_ANNOT,
+    I8_ANNOT,
+    I16_ANNOT,
+    I32_ANNOT,
+    I64_ANNOT,
+    U8_ANNOT,
+    U16_ANNOT,
+    U32_ANNOT,
+    U64_ANNOT,
+
+    ARR_ANNOT,
+    PTR_ANNOT,
+    FUN_ANNOT,
+    STRUCT_ANNOT,
+    ENUM_ANNOT,
+    TYPEDEF_ANNOT,
 };
 
-struct PtrTypeData {
-    Type* type;
+struct PtrAnnotData {
+    Annot* type;
     bool mutable;
 };
 
-struct FunTypeData {
+struct FunAnnotData {
     size_t paramc, optc;
-    Type* paramt;
-    Type* ret;
+    Annot* paramt;
+    Annot* ret;
 };
 
-struct StructTypeData {
-    size_t id;
-    char* name;
-    size_t paramc, optc;
-    char** paramv;
-    Type* paramt;
-};
+typedef struct PtrAnnotData PtrAnnotData;
+typedef struct FunAnnotData FunAnnotData;
 
-struct EnumTypeData {
-    size_t id;
-    char* name;
-    size_t len;
-    char** items;
-};
+typedef enum AnnotEnum AnnotEnum;
 
-struct EnumItemData {
-    size_t id;
-    char* name;
-    char* item;
-};
-
-struct TypedefTypeData {
-    size_t id;
-    char* name;
-    Type* type;
-};
-
-typedef struct PtrTypeData PtrTypeData;
-typedef struct FunTypeData FunTypeData;
-typedef struct StructTypeData StructTypeData;
-typedef struct EnumTypeData EnumTypeData;
-typedef struct EnumItemData EnumItemData;
-typedef struct TypedefTypeData TypedefTypeData;
-
-typedef enum TypeEnum TypeEnum;
-
-struct Type {
-    TypeEnum type;
+struct Annot {
+    AnnotEnum type;
     bool lvalue;
     bool mutable;
 
     union {
         Token atom;
-        PtrTypeData ptr;
-        FunTypeData fun;
-        StructTypeData structtype;
-        EnumTypeData enumtype;
-        EnumItemData enumitem;
-        TypedefTypeData typedeftype;
+        PtrAnnotData ptr;
+        FunAnnotData fun;
+        Symbol* typedefdata;
     };
 };
 
-bool typecheck(AST* ast);
+SymbolTable* typecheck(AST* ast);
 void free_typed_ast_p(AST* ast);
-Type clone_type(Type type);

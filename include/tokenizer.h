@@ -5,7 +5,7 @@
 
 typedef int64_t literal_t;
 #define PRIliteral PRIi64
-#define LITERAL_TYPE I64_TYPE
+#define LITERAL_TYPE I64_ANNOT
 
 typedef struct Token Token;
 
