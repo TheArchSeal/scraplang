@@ -12,16 +12,21 @@ struct TokenMapItem {
     TokenEnum val;
 };
 const TokenMapItem keywords[] = {
-    { "var", VAR_TOKEN },           { "const", CONST_TOKEN },   { "fn", FN_TOKEN },
-    { "wire", WIRE_TOKEN },         { "part", PART_TOKEN },     { "primitive", PRIMITIVE_TOKEN },
-    { "struct", STRUCT_TOKEN },     { "enum", ENUM_TOKEN },     { "if", IF_TOKEN },
-    { "else", ELSE_TOKEN },         { "switch", SWITCH_TOKEN }, { "case", CASE_TOKEN },
-    { "default", DEFAULT_TOKEN },   { "while", WHILE_TOKEN },   { "do", DO_TOKEN },
-    { "for", FOR_TOKEN },           { "return", RETURN_TOKEN }, { "break", BREAK_TOKEN },
-    { "continue", CONTINUE_TOKEN }, { "type", TYPE_TOKEN },     { "void", VOID_TOKEN },
-    { "bool", BOOL_TOKEN },         { "i8", I8_TOKEN },         { "i16", I16_TOKEN },
-    { "i32", I32_TOKEN },           { "i64", I64_TOKEN },       { "u8", U8_TOKEN },
-    { "u16", U16_TOKEN },           { "u32", U32_TOKEN },       { "u64", U64_TOKEN },
+    { "var", VAR_TOKEN },         { "const", CONST_TOKEN },
+    { "fn", FN_TOKEN },           { "wire", WIRE_TOKEN },
+    { "part", PART_TOKEN },       { "primitive", PRIMITIVE_TOKEN },
+    { "struct", STRUCT_TOKEN },   { "enum", ENUM_TOKEN },
+    { "typedef", TYPEDEF_TOKEN }, { "if", IF_TOKEN },
+    { "else", ELSE_TOKEN },       { "switch", SWITCH_TOKEN },
+    { "case", CASE_TOKEN },       { "default", DEFAULT_TOKEN },
+    { "while", WHILE_TOKEN },     { "do", DO_TOKEN },
+    { "for", FOR_TOKEN },         { "return", RETURN_TOKEN },
+    { "break", BREAK_TOKEN },     { "continue", CONTINUE_TOKEN },
+    { "void", VOID_TOKEN },       { "bool", BOOL_TOKEN },
+    { "i8", I8_TOKEN },           { "i16", I16_TOKEN },
+    { "i32", I32_TOKEN },         { "i64", I64_TOKEN },
+    { "u8", U8_TOKEN },           { "u16", U16_TOKEN },
+    { "u32", U32_TOKEN },         { "u64", U64_TOKEN },
 };
 const TokenMapItem symbols[] = {
     { "(", LPAREN },     { ")", RPAREN },     { "[", LBRACKET },   { "]", RBRACKET },

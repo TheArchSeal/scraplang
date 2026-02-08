@@ -81,9 +81,9 @@ err:
 }
 
 Stmt parse_typedef(const Token** it) {
-    // type x = a;
+    // typedef x = a;
 
-    // type
+    // typedef
     Token start = *(*it)++;
 
     // variable name =
@@ -583,9 +583,9 @@ Stmt parse_stmt(const Token** it) {
             (*it)++;
             break;
 
-        case VAR_TOKEN:   return parse_decl(it, true);
-        case CONST_TOKEN: return parse_decl(it, false);
-        case TYPE_TOKEN:  return parse_typedef(it);
+        case VAR_TOKEN:     return parse_decl(it, true);
+        case CONST_TOKEN:   return parse_decl(it, false);
+        case TYPEDEF_TOKEN: return parse_typedef(it);
 
         case IF_TOKEN:     return parse_ifelse(it);
         case SWITCH_TOKEN: return parse_switch(it);

@@ -79,6 +79,7 @@ enum TokenEnum {
     PRIMITIVE_TOKEN,
     STRUCT_TOKEN,
     ENUM_TOKEN,
+    TYPEDEF_TOKEN,
 
     IF_TOKEN,
     ELSE_TOKEN,
@@ -93,7 +94,6 @@ enum TokenEnum {
     BREAK_TOKEN,
     CONTINUE_TOKEN,
 
-    TYPE_TOKEN,
     VOID_TOKEN,
     BOOL_TOKEN,
     I8_TOKEN,

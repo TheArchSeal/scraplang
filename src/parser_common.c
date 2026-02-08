@@ -57,7 +57,7 @@ bool is_statement(const Token* const* it) {
         case SEMICOLON:
         case VAR_TOKEN:
         case CONST_TOKEN:
-        case TYPE_TOKEN:
+        case TYPEDEF_TOKEN:
         case IF_TOKEN:
         case SWITCH_TOKEN:
         case WHILE_TOKEN:
